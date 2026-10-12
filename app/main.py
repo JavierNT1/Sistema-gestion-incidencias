@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from conexion import obtener_conexion
+from app.crud import obtener_incidencias, obtener_incidencia_por_id, crear_incidencia, actualizar_incidencia, eliminar_incidencia
 from app.schemas import IncidenciaNueva, IncidenciaRespuesta
 
 app = FastAPI()
@@ -11,155 +11,58 @@ def inicio():
 
 @app.get("/incidencias", response_model=list[IncidenciaRespuesta])
 def inicio1():
-    conexion = obtener_conexion()
-
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                "SELECT id, titulo, prioridad FROM incidencias"
-            )
-            filas = cursor.fetchall()
-
-        resultado = []
-        for fila in filas:
-            incidencia = {
-                "id": fila[0],
-                "titulo": fila[1],
-                "prioridad": fila[2]
-            }
-            resultado.append(incidencia)
-
-        return resultado
-
-    finally:
-        conexion.close()
+    return obtener_incidencias()
 
 
 @app.get("/incidencias/{id}", response_model=IncidenciaRespuesta)
 def inicio2(id: int):
-    conexion = obtener_conexion()
+    incidencia = obtener_incidencia_por_id(id)
 
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT id, titulo, prioridad
-                FROM incidencias
-                WHERE id = %s
-                """,
-                (id,)
-            )
-            fila = cursor.fetchone()
-    finally:
-        conexion.close()
-
-    if fila is None:
+    if incidencia is None:
         raise HTTPException(
             status_code=404,
             detail="Incidencia no encontrada"
         )
 
-    return {
-        "id": fila[0],
-        "titulo": fila[1],
-        "prioridad": fila[2]
-    }
+    return incidencia
 
 
 @app.post("/incidencias", response_model=IncidenciaRespuesta, status_code=201)
-def crear_incidencia(incidencia: IncidenciaNueva):
-    conexion = obtener_conexion()
-
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO incidencias (titulo, prioridad)
-                VALUES (%s, %s)
-                RETURNING id, titulo, prioridad
-                """,
-                (incidencia.titulo, incidencia.prioridad)
-            )
-            fila = cursor.fetchone()
-
-        conexion.commit()
-
-    finally:
-        conexion.close()
-
-    return {
-        "id": fila[0],
-        "titulo": fila[1],
-        "prioridad": fila[2]
-    }
+def crear_incidencia_endpoint(incidencia: IncidenciaNueva):
+    return crear_incidencia(
+        incidencia.titulo,
+        incidencia.prioridad.value
+    )
 
 
 @app.put("/incidencias/{id}", response_model=IncidenciaRespuesta)
-def actualizar_incidencia(incidencia: IncidenciaNueva, id: int):
-    conexion = obtener_conexion()
+def actualizar_incidencia_endpoint(
+    id: int,
+    incidencia: IncidenciaNueva
+):
+    resultado = actualizar_incidencia(
+        id,
+        incidencia.titulo,
+        incidencia.prioridad.value
+    )
 
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE incidencias
-                SET titulo = %s, prioridad = %s
-                WHERE id = %s
-                RETURNING id, titulo, prioridad
-                """,
-                (incidencia.titulo, incidencia.prioridad, id)
-            )
-            fila = cursor.fetchone()
-
-        if fila is not None:
-            conexion.commit()
-
-    finally:
-        conexion.close()
-
-    if fila is None:
+    if resultado is None:
         raise HTTPException(
             status_code=404,
             detail="Incidencia no encontrada"
         )
 
-    return {
-        "id": fila[0],
-        "titulo": fila[1],
-        "prioridad": fila[2]
-    }
-
+    return resultado
 
 
 @app.delete("/incidencias/{id}")
-def eliminar_incidencia(id: int):
-    conexion = obtener_conexion()
+def eliminar_incidencia_endpoint(id: int):
+    resultado = eliminar_incidencia(id)
 
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                """
-                DELETE FROM incidencias
-                WHERE id = %s
-                RETURNING id
-                """,
-                (id,)
-            )
-            fila = cursor.fetchone()
-
-        if fila is not None:
-            conexion.commit()
-
-    finally:
-        conexion.close()
-
-    if fila is None:
+    if resultado is None:
         raise HTTPException(
             status_code=404,
             detail="Incidencia no encontrada"
         )
 
-    return {
-        "mensaje": "Incidencia eliminada",
-        "id": fila[0]
-    }
+    return resultado
