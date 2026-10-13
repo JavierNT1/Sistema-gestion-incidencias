@@ -13,3 +13,12 @@ def obtener_conexion():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD")
     )
+
+def obtener_conexion_pruebas():
+    return psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT")),
+        dbname="incidencias_test",
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
+    )
