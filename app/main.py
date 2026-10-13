@@ -1,5 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from app.crud import obtener_incidencias, obtener_incidencia_por_id, crear_incidencia, actualizar_incidencia, eliminar_incidencia
+from app.crud import (
+    obtener_incidencias,
+    obtener_incidencia_por_id,
+    crear_incidencia,
+    actualizar_incidencia,
+    eliminar_incidencia,
+)
 from app.schemas import IncidenciaNueva, IncidenciaRespuesta
 
 app = FastAPI()
