@@ -77,11 +77,9 @@ Para ejecutarlo mediante Docker, se necesita Docker Desktop con Docker Compose.
 ### 1. Clonar el repositorio
 
 ```bash
-git clone URL_DEL_REPOSITORIO
+git clone [(https://github.com/JavierNT1/Sistema-gestion-incidencias)]
 cd sistema-incidencias
 ```
-
-Reemplaza `URL_DEL_REPOSITORIO` por la dirección real del repositorio. Si ya tienes el proyecto descargado, puedes omitir este paso.
 
 ### 2. Crear y activar el entorno virtual
 
@@ -111,8 +109,6 @@ DB_PASSWORD=tu_clave
 ```
 
 Reemplaza `tu_clave` por la contraseña configurada para PostgreSQL.
-
-**Importante:** no compartas el archivo `.env` ni subas tus credenciales al repositorio.
 
 ### 5. Preparar la base de datos
 
