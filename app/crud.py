@@ -2,14 +2,33 @@
 from conexion import obtener_conexion
 
 
-def obtener_incidencias():
+def obtener_incidencias(prioridad: str | None = None):
     conexion = obtener_conexion()
 
     try:
         with conexion.cursor() as cursor:
-            cursor.execute(
-                "SELECT id, titulo, prioridad FROM incidencias"
-            )
+            consulta = """
+                SELECT id, titulo, prioridad, fecha_creacion
+                FROM incidencias
+            """
+            parametros = ()
+
+            if prioridad is not None:
+                consulta += " WHERE prioridad = %s"
+                parametros = (prioridad,)
+
+            consulta += """
+                ORDER BY
+                    CASE prioridad
+                        WHEN 'Alta' THEN 1
+                        WHEN 'Media' THEN 2
+                        WHEN 'Baja' THEN 3
+                        ELSE 4
+                    END,
+                    fecha_creacion ASC
+            """
+
+            cursor.execute(consulta, parametros)
             filas = cursor.fetchall()
 
         resultado = []
@@ -18,7 +37,8 @@ def obtener_incidencias():
             incidencia = {
                 "id": fila[0],
                 "titulo": fila[1],
-                "prioridad": fila[2]
+                "prioridad": fila[2],
+                "fecha_creacion": fila[3]
             }
             resultado.append(incidencia)
 
@@ -35,7 +55,7 @@ def obtener_incidencia_por_id(id: int):
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, titulo, prioridad
+                SELECT id, titulo, prioridad, fecha_creacion
                 FROM incidencias
                 WHERE id = %s
                 """,
@@ -49,7 +69,8 @@ def obtener_incidencia_por_id(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2]
+            "prioridad": fila[2],
+            "fecha_creacion": fila[3]
         }
 
     finally:
@@ -65,7 +86,7 @@ def crear_incidencia(titulo: str, prioridad: str):
                 """
                 INSERT INTO incidencias (titulo, prioridad)
                 VALUES (%s, %s)
-                RETURNING id, titulo, prioridad
+                RETURNING id, titulo, prioridad, fecha_creacion
                 """,
                 (titulo, prioridad)
             )
@@ -76,11 +97,13 @@ def crear_incidencia(titulo: str, prioridad: str):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2]
+            "prioridad": fila[2],
+            "fecha_creacion": fila[3]
         }
 
     finally:
         conexion.close()
+
 
 
 def actualizar_incidencia(id: int, titulo: str, prioridad: str):
@@ -93,7 +116,7 @@ def actualizar_incidencia(id: int, titulo: str, prioridad: str):
                 UPDATE incidencias
                 SET titulo = %s, prioridad = %s
                 WHERE id = %s
-                RETURNING id, titulo, prioridad
+                RETURNING id, titulo, prioridad, fecha_creacion
                 """,
                 (titulo, prioridad, id)
             )
@@ -104,7 +127,8 @@ def actualizar_incidencia(id: int, titulo: str, prioridad: str):
             return {
                 "id": fila[0],
                 "titulo": fila[1],
-                "prioridad": fila[2]
+                "prioridad": fila[2],
+                "fecha_creacion": fila[3]
             }
 
         return None
@@ -122,7 +146,7 @@ def eliminar_incidencia(id: int):
                 """
                 DELETE FROM incidencias
                 WHERE id = %s
-                RETURNING id, titulo, prioridad
+                RETURNING id, titulo, prioridad, fecha_creacion
                 """,
                 (id,)
             )
@@ -136,7 +160,8 @@ def eliminar_incidencia(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2]
+            "prioridad": fila[2],
+            "fecha_creacion": fila[3]
         }
 
     finally:

@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, field_validator
-
+from datetime import datetime
 
 class Prioridad(str, Enum):
     BAJA = "Baja"
@@ -39,3 +39,4 @@ class IncidenciaRespuesta(BaseModel):
     id: int
     titulo: str
     prioridad: Prioridad
+    fecha_creacion: datetime

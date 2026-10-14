@@ -26,7 +26,7 @@ def test_insertar_incidencia():
                 """
                 INSERT INTO incidencias (titulo, prioridad)
                 VALUES (%s, %s)
-                RETURNING id, titulo, prioridad
+                RETURNING id, titulo, prioridad, fecha_creacion
                 """,
                 ("Prueba automatizada", "Alta")
             )
@@ -36,10 +36,12 @@ def test_insertar_incidencia():
             assert incidencia is not None
             assert incidencia[1] == "Prueba automatizada"
             assert incidencia[2] == "Alta"
+            assert incidencia[3] is not None
 
     finally:
         conexion.rollback()
         conexion.close()
+
 
 def test_consultar_incidencia_insertada():
     conexion = obtener_conexion_pruebas()
@@ -59,7 +61,7 @@ def test_consultar_incidencia_insertada():
 
             cursor.execute(
                 """
-                SELECT id, titulo, prioridad
+                SELECT id, titulo, prioridad, fecha_creacion
                 FROM incidencias
                 WHERE id = %s
                 """,
@@ -72,10 +74,12 @@ def test_consultar_incidencia_insertada():
         assert incidencia[0] == id_creado
         assert incidencia[1] == "Incidencia para consultar"
         assert incidencia[2] == "Media"
+        assert incidencia[3] is not None
 
     finally:
         conexion.rollback()
         conexion.close()
+
 
 def test_actualizar_incidencia_postgresql():
     conexion = obtener_conexion_pruebas()
@@ -86,19 +90,19 @@ def test_actualizar_incidencia_postgresql():
                 """
                 INSERT INTO incidencias (titulo, prioridad)
                 VALUES (%s, %s)
-                RETURNING id
+                RETURNING id, fecha_creacion
                 """,
                 ("Título original", "Baja")
             )
 
-            id_creado = cursor.fetchone()[0]
+            id_creado, fecha_original = cursor.fetchone()
 
             cursor.execute(
                 """
                 UPDATE incidencias
                 SET titulo = %s, prioridad = %s
                 WHERE id = %s
-                RETURNING id, titulo, prioridad
+                RETURNING id, titulo, prioridad, fecha_creacion
                 """,
                 ("Título actualizado", "Alta", id_creado)
             )
@@ -109,6 +113,7 @@ def test_actualizar_incidencia_postgresql():
         assert incidencia[0] == id_creado
         assert incidencia[1] == "Título actualizado"
         assert incidencia[2] == "Alta"
+        assert incidencia[3] == fecha_original
 
     finally:
         conexion.rollback()
@@ -172,6 +177,7 @@ def test_crud_crear_incidencia():
             assert incidencia["id"] is not None
             assert incidencia["titulo"] == "Prueba desde CRUD"
             assert incidencia["prioridad"] == "Alta"
+            assert incidencia["fecha_creacion"] is not None
 
             encontrada = crud.obtener_incidencia_por_id(
                 incidencia["id"]
@@ -209,6 +215,7 @@ def test_crud_listar_incidencias():
             )
 
             assert encontrada == incidencia
+            assert encontrada["fecha_creacion"] is not None
 
         finally:
             crud.eliminar_incidencia(incidencia["id"])
@@ -231,11 +238,10 @@ def test_crud_actualizar_incidencia():
                 "Alta"
             )
 
-            assert actualizada == {
-                "id": incidencia["id"],
-                "titulo": "Título actualizado",
-                "prioridad": "Alta"
-            }
+            assert actualizada["id"] == incidencia["id"]
+            assert actualizada["titulo"] == "Título actualizado"
+            assert actualizada["prioridad"] == "Alta"
+            assert actualizada["fecha_creacion"] == incidencia["fecha_creacion"]
 
         finally:
             crud.eliminar_incidencia(incidencia["id"])

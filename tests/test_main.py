@@ -39,9 +39,9 @@ def test_crear_incidencia():
     incidencia_falsa = {
         "id": 100,
         "titulo": "Error en el sistema",
-        "prioridad": "Alta"
+        "prioridad": "Alta",
+        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
-
     with patch(
         "app.main.crear_incidencia",
         return_value=incidencia_falsa
@@ -66,12 +66,14 @@ def test_listar_incidencias():
         {
             "id": 1,
             "titulo": "Error de conexión",
-            "prioridad": "Alta"
+            "prioridad": "Alta",
+            "fecha_creacion": "2026-10-10T12:00:00Z"
         },
         {
             "id": 2,
             "titulo": "Problema de impresión",
-            "prioridad": "Media"
+            "prioridad": "Media",
+            "fecha_creacion": "2026-10-10T12:00:00Z"
         }
     ]
 
@@ -102,7 +104,8 @@ def test_actualizar_incidencia():
     incidencia_actualizada = {
         "id": 1,
         "titulo": "Error corregido",
-        "prioridad": "Media"
+        "prioridad": "Media",
+        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
 
     with patch(
@@ -130,7 +133,8 @@ def test_eliminar_incidencia():
     incidencia_eliminada = {
         "id": 1,
         "titulo": "Error de prueba",
-        "prioridad": "Alta"
+        "prioridad": "Alta",
+        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
 
     with patch(
