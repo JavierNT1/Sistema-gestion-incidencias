@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+
 from app.crud import (
     obtener_incidencias,
     obtener_incidencia_por_id,
@@ -6,9 +7,15 @@ from app.crud import (
     actualizar_incidencia,
     eliminar_incidencia,
 )
-from app.schemas import IncidenciaNueva, IncidenciaRespuesta
+
+from app.schemas import (
+    IncidenciaNueva,
+    IncidenciaRespuesta,
+    Prioridad,
+)
 
 app = FastAPI()
+
 
 @app.get("/")
 def inicio():
@@ -16,12 +23,14 @@ def inicio():
 
 
 @app.get("/incidencias", response_model=list[IncidenciaRespuesta])
-def inicio1():
-    return obtener_incidencias()
+def listar_incidencias(prioridad: Prioridad | None = None):
+    return obtener_incidencias(
+        prioridad.value if prioridad else None
+    )
 
 
 @app.get("/incidencias/{id}", response_model=IncidenciaRespuesta)
-def inicio2(id: int):
+def consultar_incidencia(id: int):
     incidencia = obtener_incidencia_por_id(id)
 
     if incidencia is None:
@@ -33,7 +42,11 @@ def inicio2(id: int):
     return incidencia
 
 
-@app.post("/incidencias", response_model=IncidenciaRespuesta, status_code=201)
+@app.post(
+    "/incidencias",
+    response_model=IncidenciaRespuesta,
+    status_code=201
+)
 def crear_incidencia_endpoint(incidencia: IncidenciaNueva):
     return crear_incidencia(
         incidencia.titulo,
@@ -61,7 +74,10 @@ def actualizar_incidencia_endpoint(
     return resultado
 
 
-@app.delete("/incidencias/{id}")
+@app.delete(
+    "/incidencias/{id}",
+    response_model=IncidenciaRespuesta
+)
 def eliminar_incidencia_endpoint(id: int):
     resultado = eliminar_incidencia(id)
 

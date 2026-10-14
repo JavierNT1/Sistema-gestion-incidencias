@@ -1,5 +1,5 @@
 from unittest.mock import patch
-
+from datetime import datetime, timezone
 from conexion import obtener_conexion_pruebas
 from app import crud
 
@@ -245,3 +245,75 @@ def test_crud_actualizar_incidencia():
 
         finally:
             crud.eliminar_incidencia(incidencia["id"])
+
+
+def test_filtrar_y_ordenar_incidencias_postgresql():
+    ids = []
+
+    with patch(
+        "app.crud.obtener_conexion",
+        obtener_conexion_pruebas
+    ):
+        conexion = obtener_conexion_pruebas()
+
+        try:
+            # 1. Insertar incidencias con fechas controladas.
+            with conexion.cursor() as cursor:
+                datos = [
+                    (
+                        "Prueba orden Baja",
+                        "Baja",
+                        datetime(2026, 10, 10, tzinfo=timezone.utc)
+                    ),
+                    (
+                        "Prueba orden Alta",
+                        "Alta",
+                        datetime(2026, 10, 12, tzinfo=timezone.utc)
+                    ),
+                    (
+                        "Prueba orden Media",
+                        "Media",
+                        datetime(2026, 10, 11, tzinfo=timezone.utc)
+                    ),
+                ]
+
+                for titulo, prioridad, fecha in datos:
+                    cursor.execute(
+                        """
+                        INSERT INTO incidencias
+                            (titulo, prioridad, fecha_creacion)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                        """,
+                        (titulo, prioridad, fecha)
+                    )
+                    ids.append(cursor.fetchone()[0])
+
+            conexion.commit()
+
+            # 2. Comprobar el orden por prioridad.
+            todas = crud.obtener_incidencias()
+            pruebas = [i for i in todas if i["id"] in ids]
+
+            assert [i["prioridad"] for i in pruebas] == [
+                "Alta", "Media", "Baja"
+            ]
+
+            # 3. Comprobar el filtro por prioridad.
+            altas = crud.obtener_incidencias("Alta")
+            altas_prueba = [i for i in altas if i["id"] in ids]
+
+            assert len(altas_prueba) == 1
+            assert altas_prueba[0]["titulo"] == "Prueba orden Alta"
+
+        finally:
+            try:
+                with conexion.cursor() as cursor:
+                    if ids:
+                        cursor.execute(
+                            "DELETE FROM incidencias WHERE id = ANY(%s)",
+                            (ids,)
+                        )
+                conexion.commit()
+            finally:
+                conexion.close()

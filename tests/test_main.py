@@ -85,7 +85,7 @@ def test_listar_incidencias():
 
     assert respuesta.status_code == 200
     assert respuesta.json() == incidencias_falsas
-    obtener_mock.assert_called_once_with()
+    obtener_mock.assert_called_once_with(None)
 
 
 def test_incidencia_no_encontrada():
@@ -177,3 +177,34 @@ def test_eliminar_incidencia_inexistente():
     assert respuesta.json() == {
         "detail": "Incidencia no encontrada"
     }
+
+
+def test_filtrar_incidencias_por_prioridad():
+    incidencias_falsas = [
+        {
+            "id": 1,
+            "titulo": "Error crítico",
+            "prioridad": "Alta",
+            "fecha_creacion": "2026-10-10T12:00:00Z"
+        }
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias_falsas
+    ) as obtener_mock:
+        respuesta = client.get(
+            "/incidencias?prioridad=Alta"
+        )
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == incidencias_falsas
+    obtener_mock.assert_called_once_with("Alta")
+
+
+def test_rechazar_filtro_prioridad_invalida():
+    respuesta = client.get(
+        "/incidencias?prioridad=Urgente"
+    )
+
+    assert respuesta.status_code == 422
