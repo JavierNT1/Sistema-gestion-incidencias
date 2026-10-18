@@ -8,8 +8,10 @@ class Prioridad(str, Enum):
     ALTA = "Alta"
 
 #Lo que el cliente nos envía.
+
 class IncidenciaNueva(BaseModel):
     titulo: str
+    descripcion: str
     prioridad: Prioridad
 
     @field_validator("titulo")
@@ -27,6 +29,16 @@ class IncidenciaNueva(BaseModel):
 
         return valor
 
+    @field_validator("descripcion")
+    @classmethod
+    def validar_descripcion(cls, valor):
+        valor = valor.strip()
+
+        if not valor:
+            raise ValueError("La descripción no puede estar vacía")
+
+        return valor
+
     @field_validator("prioridad", mode="before")
     @classmethod
     def normalizar_prioridad(cls, valor):
@@ -34,9 +46,11 @@ class IncidenciaNueva(BaseModel):
             valor = valor.strip().capitalize()
         return valor
 
+
 #Lo que nuestra API devuelve.
 class IncidenciaRespuesta(BaseModel):
     id: int
     titulo: str
+    descripcion: str 
     prioridad: Prioridad
     fecha_creacion: datetime

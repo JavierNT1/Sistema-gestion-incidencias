@@ -8,7 +8,7 @@ def obtener_incidencias(prioridad: str | None = None):
     try:
         with conexion.cursor() as cursor:
             consulta = """
-                SELECT id, titulo, prioridad, fecha_creacion
+                SELECT id, titulo, descripcion, prioridad, fecha_creacion
                 FROM incidencias
             """
             parametros = ()
@@ -37,8 +37,9 @@ def obtener_incidencias(prioridad: str | None = None):
             incidencia = {
                 "id": fila[0],
                 "titulo": fila[1],
-                "prioridad": fila[2],
-                "fecha_creacion": fila[3]
+                "descripcion": fila[2],
+                "prioridad": fila[3],
+                "fecha_creacion": fila[4],
             }
             resultado.append(incidencia)
 
@@ -55,11 +56,11 @@ def obtener_incidencia_por_id(id: int):
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, titulo, prioridad, fecha_creacion
+                SELECT id, titulo, descripcion, prioridad, fecha_creacion
                 FROM incidencias
                 WHERE id = %s
                 """,
-                (id,)
+                (id,),
             )
             fila = cursor.fetchone()
 
@@ -69,26 +70,27 @@ def obtener_incidencia_por_id(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2],
-            "fecha_creacion": fila[3]
+            "descripcion": fila[2],
+            "prioridad": fila[3],
+            "fecha_creacion": fila[4],
         }
 
     finally:
         conexion.close()
 
 
-def crear_incidencia(titulo: str, prioridad: str):
+def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
     conexion = obtener_conexion()
 
     try:
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO incidencias (titulo, prioridad)
-                VALUES (%s, %s)
-                RETURNING id, titulo, prioridad, fecha_creacion
+                INSERT INTO incidencias (titulo, descripcion, prioridad)
+                VALUES (%s, %s, %s)
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
                 """,
-                (titulo, prioridad)
+                (titulo, descripcion, prioridad),
             )
             fila = cursor.fetchone()
 
@@ -97,16 +99,21 @@ def crear_incidencia(titulo: str, prioridad: str):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2],
-            "fecha_creacion": fila[3]
+            "descripcion": fila[2],
+            "prioridad": fila[3],
+            "fecha_creacion": fila[4],
         }
 
     finally:
         conexion.close()
 
 
-
-def actualizar_incidencia(id: int, titulo: str, prioridad: str):
+def actualizar_incidencia(
+    id: int,
+    titulo: str,
+    descripcion: str,
+    prioridad: str,
+):
     conexion = obtener_conexion()
 
     try:
@@ -114,21 +121,23 @@ def actualizar_incidencia(id: int, titulo: str, prioridad: str):
             cursor.execute(
                 """
                 UPDATE incidencias
-                SET titulo = %s, prioridad = %s
+                SET titulo = %s, descripcion = %s, prioridad = %s
                 WHERE id = %s
-                RETURNING id, titulo, prioridad, fecha_creacion
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
                 """,
-                (titulo, prioridad, id)
+                (titulo, descripcion, prioridad, id),
             )
             fila = cursor.fetchone()
 
         if fila is not None:
             conexion.commit()
+
             return {
                 "id": fila[0],
                 "titulo": fila[1],
-                "prioridad": fila[2],
-                "fecha_creacion": fila[3]
+                "descripcion": fila[2],
+                "prioridad": fila[3],
+                "fecha_creacion": fila[4],
             }
 
         return None
@@ -146,9 +155,9 @@ def eliminar_incidencia(id: int):
                 """
                 DELETE FROM incidencias
                 WHERE id = %s
-                RETURNING id, titulo, prioridad, fecha_creacion
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
                 """,
-                (id,)
+                (id,),
             )
             fila = cursor.fetchone()
 
@@ -160,8 +169,9 @@ def eliminar_incidencia(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "prioridad": fila[2],
-            "fecha_creacion": fila[3]
+            "descripcion": fila[2],
+            "prioridad": fila[3],
+            "fecha_creacion": fila[4],
         }
 
     finally:

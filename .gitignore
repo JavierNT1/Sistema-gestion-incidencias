@@ -1,4 +1,22 @@
+
+# Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Variables de entorno y secretos
 .env
+.env.*
+!.env.example
+
+# Node.js y frontend
+node_modules/
+dist/
+coverage/
+
+# Entornos y archivos del sistema
+.vscode/
+.DS_Store
+Thumbs.db

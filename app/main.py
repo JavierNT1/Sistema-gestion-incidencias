@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.crud import (
     obtener_incidencias,
@@ -16,6 +17,15 @@ from app.schemas import (
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def inicio():
@@ -50,6 +60,7 @@ def consultar_incidencia(id: int):
 def crear_incidencia_endpoint(incidencia: IncidenciaNueva):
     return crear_incidencia(
         incidencia.titulo,
+        incidencia.descripcion,
         incidencia.prioridad.value
     )
 
@@ -62,6 +73,7 @@ def actualizar_incidencia_endpoint(
     resultado = actualizar_incidencia(
         id,
         incidencia.titulo,
+        incidencia.descripcion,
         incidencia.prioridad.value
     )
 

@@ -18,6 +18,7 @@ def test_rechazar_prioridad_invalida():
         "/incidencias",
         json={
             "titulo": "Prueba de validación",
+            "descripcion": "Descripción de prueba",
             "prioridad": "Urgente"
         }
     )
@@ -29,6 +30,7 @@ def test_rechazar_titulo_vacio():
         "/incidencias",
         json={
             "titulo": "   ",
+            "descripcion": "Descripción de prueba",
             "prioridad": "Alta"
         }
     )
@@ -39,6 +41,7 @@ def test_crear_incidencia():
     incidencia_falsa = {
         "id": 100,
         "titulo": "Error en el sistema",
+        "descripcion": "El sistema no responde",
         "prioridad": "Alta",
         "fecha_creacion": "2026-10-10T12:00:00Z"
     }
@@ -50,6 +53,7 @@ def test_crear_incidencia():
             "/incidencias",
             json={
                 "titulo": "Error en el sistema",
+                "descripcion": "El sistema no responde",
                 "prioridad": "Alta"
             }
         )
@@ -58,6 +62,7 @@ def test_crear_incidencia():
     assert respuesta.json() == incidencia_falsa
     crear_mock.assert_called_once_with(
         "Error en el sistema",
+        "El sistema no responde",
         "Alta"
     )
 
@@ -66,12 +71,14 @@ def test_listar_incidencias():
         {
             "id": 1,
             "titulo": "Error de conexión",
+            "descripcion": "El sistema no responde",
             "prioridad": "Alta",
             "fecha_creacion": "2026-10-10T12:00:00Z"
         },
         {
             "id": 2,
             "titulo": "Problema de impresión",
+            "descripcion": "El sistema no responde",
             "prioridad": "Media",
             "fecha_creacion": "2026-10-10T12:00:00Z"
         }
@@ -104,6 +111,7 @@ def test_actualizar_incidencia():
     incidencia_actualizada = {
         "id": 1,
         "titulo": "Error corregido",
+        "descripcion": "El sistema no responde",
         "prioridad": "Media",
         "fecha_creacion": "2026-10-10T12:00:00Z"
     }
@@ -116,6 +124,7 @@ def test_actualizar_incidencia():
             "/incidencias/1",
             json={
                 "titulo": "Error corregido",
+                "descripcion": "El sistema no responde",
                 "prioridad": "Media"
             }
         )
@@ -125,6 +134,7 @@ def test_actualizar_incidencia():
     actualizar_mock.assert_called_once_with(
         1,
         "Error corregido",
+        "El sistema no responde",
         "Media"
     )
 
@@ -133,6 +143,7 @@ def test_eliminar_incidencia():
     incidencia_eliminada = {
         "id": 1,
         "titulo": "Error de prueba",
+        "descripcion": "El sistema no responde",
         "prioridad": "Alta",
         "fecha_creacion": "2026-10-10T12:00:00Z"
     }
@@ -156,6 +167,7 @@ def test_actualizar_incidencia_inexistente():
             "/incidencias/9999",
             json={
                 "titulo": "Prueba",
+                "descripcion": "El sistema no responde",
                 "prioridad": "Alta"
             }
         )
@@ -184,6 +196,7 @@ def test_filtrar_incidencias_por_prioridad():
         {
             "id": 1,
             "titulo": "Error crítico",
+            "descripcion": "El sistema no responde",
             "prioridad": "Alta",
             "fecha_creacion": "2026-10-10T12:00:00Z"
         }
