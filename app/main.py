@@ -7,12 +7,15 @@ from app.crud import (
     crear_incidencia,
     actualizar_incidencia,
     eliminar_incidencia,
+    iniciar_atencion,
+    resolver_incidencia
 )
 
 from app.schemas import (
     IncidenciaNueva,
     IncidenciaRespuesta,
     Prioridad,
+    Estado,
 )
 
 app = FastAPI()
@@ -52,11 +55,7 @@ def consultar_incidencia(id: int):
     return incidencia
 
 
-@app.post(
-    "/incidencias",
-    response_model=IncidenciaRespuesta,
-    status_code=201
-)
+@app.post("/incidencias",response_model=IncidenciaRespuesta,status_code=201)
 def crear_incidencia_endpoint(incidencia: IncidenciaNueva):
     return crear_incidencia(
         incidencia.titulo,
@@ -86,10 +85,7 @@ def actualizar_incidencia_endpoint(
     return resultado
 
 
-@app.delete(
-    "/incidencias/{id}",
-    response_model=IncidenciaRespuesta
-)
+@app.delete("/incidencias/{id}",response_model=IncidenciaRespuesta)
 def eliminar_incidencia_endpoint(id: int):
     resultado = eliminar_incidencia(id)
 
@@ -100,3 +96,46 @@ def eliminar_incidencia_endpoint(id: int):
         )
 
     return resultado
+
+
+@app.post("/incidencias/{id}/iniciar",response_model=IncidenciaRespuesta)
+def iniciar_atencion_endpoint(id: int):
+    resultado = iniciar_atencion(id)
+
+    if resultado is not None:
+        return resultado
+
+    # Si no se pudo iniciar, comprobamos si la incidencia existe.
+    incidencia = obtener_incidencia_por_id(id)
+
+    if incidencia is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incidencia no encontrada"
+        )
+
+    raise HTTPException(
+        status_code=409,
+        detail="No se puede iniciar la atención porque la incidencia no está pendiente"
+    )
+
+
+@app.post("/incidencias/{id}/resolver",response_model=IncidenciaRespuesta)
+def resolver_incidencia_endpoint(id: int):
+    resultado = resolver_incidencia(id)
+
+    if resultado is not None:
+        return resultado
+
+    incidencia = obtener_incidencia_por_id(id)
+
+    if incidencia is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incidencia no encontrada"
+        )
+
+    raise HTTPException(
+        status_code=409,
+        detail="No se puede resolver la incidencia porque no está en progreso"
+    )

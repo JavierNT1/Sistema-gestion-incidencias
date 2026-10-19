@@ -8,7 +8,7 @@ def obtener_incidencias(prioridad: str | None = None):
     try:
         with conexion.cursor() as cursor:
             consulta = """
-                SELECT id, titulo, descripcion, prioridad, fecha_creacion
+                SELECT id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 FROM incidencias
             """
             parametros = ()
@@ -19,6 +19,10 @@ def obtener_incidencias(prioridad: str | None = None):
 
             consulta += """
                 ORDER BY
+                    CASE
+                        WHEN estado = 'Resuelta' THEN 1
+                        ELSE 0
+                    END,
                     CASE prioridad
                         WHEN 'Alta' THEN 1
                         WHEN 'Media' THEN 2
@@ -40,6 +44,8 @@ def obtener_incidencias(prioridad: str | None = None):
                 "descripcion": fila[2],
                 "prioridad": fila[3],
                 "fecha_creacion": fila[4],
+                "estado": fila[5],
+                "fecha_resolucion": fila[6],
             }
             resultado.append(incidencia)
 
@@ -56,7 +62,7 @@ def obtener_incidencia_por_id(id: int):
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, titulo, descripcion, prioridad, fecha_creacion
+                SELECT id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 FROM incidencias
                 WHERE id = %s
                 """,
@@ -73,6 +79,8 @@ def obtener_incidencia_por_id(id: int):
             "descripcion": fila[2],
             "prioridad": fila[3],
             "fecha_creacion": fila[4],
+            "estado": fila[5],
+            "fecha_resolucion": fila[6],
         }
 
     finally:
@@ -88,7 +96,7 @@ def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
                 """
                 INSERT INTO incidencias (titulo, descripcion, prioridad)
                 VALUES (%s, %s, %s)
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 """,
                 (titulo, descripcion, prioridad),
             )
@@ -102,6 +110,8 @@ def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
             "descripcion": fila[2],
             "prioridad": fila[3],
             "fecha_creacion": fila[4],
+            "estado": fila[5],
+            "fecha_resolucion": fila[6],
         }
 
     finally:
@@ -123,7 +133,7 @@ def actualizar_incidencia(
                 UPDATE incidencias
                 SET titulo = %s, descripcion = %s, prioridad = %s
                 WHERE id = %s
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
                 """,
                 (titulo, descripcion, prioridad, id),
             )
@@ -138,6 +148,8 @@ def actualizar_incidencia(
                 "descripcion": fila[2],
                 "prioridad": fila[3],
                 "fecha_creacion": fila[4],
+                "estado": fila[5],
+                "fecha_resolucion": fila[6],
             }
 
         return None
@@ -155,7 +167,7 @@ def eliminar_incidencia(id: int):
                 """
                 DELETE FROM incidencias
                 WHERE id = %s
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion
+                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
                 """,
                 (id,),
             )
@@ -172,6 +184,96 @@ def eliminar_incidencia(id: int):
             "descripcion": fila[2],
             "prioridad": fila[3],
             "fecha_creacion": fila[4],
+            "estado": fila[5],
+            "fecha_resolucion": fila[6],
+        }
+
+    finally:
+        conexion.close()
+
+
+def iniciar_atencion(id: int):
+    conexion = obtener_conexion()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE incidencias
+                SET estado = 'En progreso'
+                WHERE id = %s
+                  AND estado = 'Pendiente'
+                RETURNING
+                    id,
+                    titulo,
+                    descripcion,
+                    prioridad,
+                    fecha_creacion,
+                    estado,
+                    fecha_resolucion
+                """,
+                (id,),
+            )
+            fila = cursor.fetchone()
+
+        if fila is None:
+            return None
+
+        conexion.commit()
+
+        return {
+            "id": fila[0],
+            "titulo": fila[1],
+            "descripcion": fila[2],
+            "prioridad": fila[3],
+            "fecha_creacion": fila[4],
+            "estado": fila[5],
+            "fecha_resolucion": fila[6],
+        }
+
+    finally:
+        conexion.close()
+
+
+
+def resolver_incidencia(id: int):
+    conexion = obtener_conexion()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE incidencias
+                SET estado = 'Resuelta',
+                    fecha_resolucion = CURRENT_TIMESTAMP
+                WHERE id = %s
+                  AND estado = 'En progreso'
+                RETURNING
+                    id,
+                    titulo,
+                    descripcion,
+                    prioridad,
+                    fecha_creacion,
+                    estado,
+                    fecha_resolucion
+                """,
+                (id,),
+            )
+            fila = cursor.fetchone()
+
+        if fila is None:
+            return None
+
+        conexion.commit()
+
+        return {
+            "id": fila[0],
+            "titulo": fila[1],
+            "descripcion": fila[2],
+            "prioridad": fila[3],
+            "fecha_creacion": fila[4],
+            "estado": fila[5],
+            "fecha_resolucion": fila[6],
         }
 
     finally:

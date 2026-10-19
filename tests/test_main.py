@@ -4,6 +4,27 @@ from unittest.mock import patch
 
 client = TestClient(app)
 
+INCIDENCIA_PENDIENTE = {
+    "id": 1,
+    "titulo": "Error de conexión",
+    "descripcion": "El sistema no responde",
+    "prioridad": "Alta",
+    "fecha_creacion": "2026-10-10T12:00:00Z",
+    "estado": "Pendiente",
+    "fecha_resolucion": None,
+}
+
+INCIDENCIA_EN_PROGRESO = {
+    **INCIDENCIA_PENDIENTE,
+    "estado": "En progreso",
+}
+
+INCIDENCIA_RESUELTA = {
+    **INCIDENCIA_PENDIENTE,
+    "estado": "Resuelta",
+    "fecha_resolucion": "2026-10-19T13:25:04.949889Z",
+}
+
 
 def test_inicio():
     respuesta = client.get("/")
@@ -39,12 +60,11 @@ def test_rechazar_titulo_vacio():
 
 def test_crear_incidencia():
     incidencia_falsa = {
+        **INCIDENCIA_PENDIENTE,
         "id": 100,
         "titulo": "Error en el sistema",
-        "descripcion": "El sistema no responde",
-        "prioridad": "Alta",
-        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
+
     with patch(
         "app.main.crear_incidencia",
         return_value=incidencia_falsa
@@ -69,19 +89,16 @@ def test_crear_incidencia():
 def test_listar_incidencias():
     incidencias_falsas = [
         {
+            **INCIDENCIA_PENDIENTE,
             "id": 1,
             "titulo": "Error de conexión",
-            "descripcion": "El sistema no responde",
-            "prioridad": "Alta",
-            "fecha_creacion": "2026-10-10T12:00:00Z"
         },
         {
+            **INCIDENCIA_PENDIENTE,
             "id": 2,
             "titulo": "Problema de impresión",
-            "descripcion": "El sistema no responde",
             "prioridad": "Media",
-            "fecha_creacion": "2026-10-10T12:00:00Z"
-        }
+        },
     ]
 
     with patch(
@@ -109,11 +126,9 @@ def test_incidencia_no_encontrada():
 
 def test_actualizar_incidencia():
     incidencia_actualizada = {
-        "id": 1,
+        **INCIDENCIA_PENDIENTE,
         "titulo": "Error corregido",
-        "descripcion": "El sistema no responde",
         "prioridad": "Media",
-        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
 
     with patch(
@@ -141,11 +156,8 @@ def test_actualizar_incidencia():
 
 def test_eliminar_incidencia():
     incidencia_eliminada = {
-        "id": 1,
+        **INCIDENCIA_PENDIENTE,
         "titulo": "Error de prueba",
-        "descripcion": "El sistema no responde",
-        "prioridad": "Alta",
-        "fecha_creacion": "2026-10-10T12:00:00Z"
     }
 
     with patch(
@@ -194,11 +206,8 @@ def test_eliminar_incidencia_inexistente():
 def test_filtrar_incidencias_por_prioridad():
     incidencias_falsas = [
         {
-            "id": 1,
+            **INCIDENCIA_PENDIENTE,
             "titulo": "Error crítico",
-            "descripcion": "El sistema no responde",
-            "prioridad": "Alta",
-            "fecha_creacion": "2026-10-10T12:00:00Z"
         }
     ]
 
@@ -221,3 +230,91 @@ def test_rechazar_filtro_prioridad_invalida():
     )
 
     assert respuesta.status_code == 422
+
+def test_iniciar_atencion():
+    with patch(
+        "app.main.iniciar_atencion",
+        return_value=INCIDENCIA_EN_PROGRESO
+    ) as iniciar_mock:
+        respuesta = client.post("/incidencias/1/iniciar")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == INCIDENCIA_EN_PROGRESO
+    iniciar_mock.assert_called_once_with(1)
+
+def test_iniciar_atencion_inexistente():
+    with patch(
+        "app.main.iniciar_atencion",
+        return_value=None
+    ), patch(
+        "app.main.obtener_incidencia_por_id",
+        return_value=None
+    ):
+        respuesta = client.post("/incidencias/9999/iniciar")
+
+    assert respuesta.status_code == 404
+    assert respuesta.json() == {
+        "detail": "Incidencia no encontrada"
+    }
+
+def test_iniciar_atencion_estado_incorrecto():
+    with patch(
+        "app.main.iniciar_atencion",
+        return_value=None
+    ), patch(
+        "app.main.obtener_incidencia_por_id",
+        return_value=INCIDENCIA_RESUELTA
+    ):
+        respuesta = client.post("/incidencias/1/iniciar")
+
+    assert respuesta.status_code == 409
+    assert respuesta.json() == {
+        "detail": (
+            "No se puede iniciar la atención porque "
+            "la incidencia no está pendiente"
+        )
+    }
+
+def test_resolver_incidencia():
+    with patch(
+        "app.main.resolver_incidencia",
+        return_value=INCIDENCIA_RESUELTA
+    ) as resolver_mock:
+        respuesta = client.post("/incidencias/1/resolver")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == INCIDENCIA_RESUELTA
+    resolver_mock.assert_called_once_with(1)
+
+def test_resolver_incidencia_inexistente():
+    with patch(
+        "app.main.resolver_incidencia",
+        return_value=None
+    ), patch(
+        "app.main.obtener_incidencia_por_id",
+        return_value=None
+    ):
+        respuesta = client.post("/incidencias/9999/resolver")
+
+    assert respuesta.status_code == 404
+    assert respuesta.json() == {
+        "detail": "Incidencia no encontrada"
+    }
+
+def test_resolver_incidencia_estado_incorrecto():
+    with patch(
+        "app.main.resolver_incidencia",
+        return_value=None
+    ), patch(
+        "app.main.obtener_incidencia_por_id",
+        return_value=INCIDENCIA_PENDIENTE
+    ):
+        respuesta = client.post("/incidencias/1/resolver")
+
+    assert respuesta.status_code == 409
+    assert respuesta.json() == {
+        "detail": (
+            "No se puede resolver la incidencia porque "
+            "no está en progreso"
+        )
+    }

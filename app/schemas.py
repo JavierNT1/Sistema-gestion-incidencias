@@ -7,6 +7,11 @@ class Prioridad(str, Enum):
     MEDIA = "Media"
     ALTA = "Alta"
 
+class Estado(str, Enum):
+    PENDIENTE = "Pendiente"
+    EN_PROGRESO = "En progreso"
+    RESUELTA = "Resuelta"
+
 #Lo que el cliente nos envía.
 
 class IncidenciaNueva(BaseModel):
@@ -54,3 +59,5 @@ class IncidenciaRespuesta(BaseModel):
     descripcion: str 
     prioridad: Prioridad
     fecha_creacion: datetime
+    estado: Estado
+    fecha_resolucion: datetime | None = None
