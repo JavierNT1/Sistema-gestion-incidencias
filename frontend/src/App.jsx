@@ -17,11 +17,13 @@ const [titulo, setTitulo] = useState('')
 const [descripcion, setDescripcion] = useState('')
 const [prioridad, setPrioridad] = useState('Media')
 const [filtroPrioridad, setFiltroPrioridad] = useState('')
+const [filtroEstado, setFiltroEstado] = useState('')
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
 const [descripcionEditada, setDescripcionEditada] = useState('')
 const [prioridadEditada, setPrioridadEditada] = useState('')
+
 async function guardarIncidencia(evento) {
 evento.preventDefault()
 
@@ -47,28 +49,42 @@ if (!respuesta.ok) {
   )
 }
 
+
 const nuevaIncidencia = await respuesta.json()
 
+// Obtener todas las incidencias con el orden del backend
+const respuestaLista = await fetch(
+  'http://127.0.0.1:8000/incidencias'
+)
 
-setTodasLasIncidencias((anteriores) => [
-  ...anteriores,
-  nuevaIncidencia,
-])
+if (!respuestaLista.ok) {
+  throw new Error('No se pudo actualizar la lista de incidencias')
+}
+
+const todas = await respuestaLista.json()
+
+// Actualizar los datos completos para las tarjetas
+setTodasLasIncidencias(todas)
+
+// Aplicar los filtros actuales a la tabla
+const incidenciasFiltradas = todas.filter((incidencia) => {
+  const coincidePrioridad =
+    filtroPrioridad === '' ||
+    incidencia.prioridad === filtroPrioridad
+
+  const coincideEstado =
+    filtroEstado === '' ||
+    incidencia.estado === filtroEstado
+
+  return coincidePrioridad && coincideEstado
+})
+
+setIncidencias(incidenciasFiltradas)
 
 setTitulo('')
 setDescripcion('')
 setPrioridad('Media')
 setMostrarFormulario(false)
-
-if (filtroPrioridad === '') {
-  setIncidencias((anteriores) => [
-    ...anteriores,
-    nuevaIncidencia,
-  ])
-} else {
-  setFiltroPrioridad('')
-}
-
 
 } catch (error) {
 setError(error.message)
@@ -87,6 +103,10 @@ try {
     url.searchParams.set('prioridad', filtroPrioridad)
   }
 
+  if (filtroEstado !== '') {
+    url.searchParams.set('estado', filtroEstado)
+  }
+
   const respuesta = await fetch(url)
 
   if (!respuesta.ok) {
@@ -96,9 +116,17 @@ try {
   const datos = await respuesta.json()
   setIncidencias(datos)
 
-  if (filtroPrioridad === '') {
-    setTodasLasIncidencias(datos)
+  const respuestaCompleta = await fetch(
+    'http://127.0.0.1:8000/incidencias'
+  )
+
+  if (!respuestaCompleta.ok) {
+    throw new Error('No se pudieron obtener todas las incidencias')
   }
+
+  const todas = await respuestaCompleta.json()
+  setTodasLasIncidencias(todas)
+
 } catch (error) {
   setError(error.message)
 } finally {
@@ -108,7 +136,7 @@ try {
 }
 
 cargarIncidencias()
-}, [filtroPrioridad])
+}, [filtroPrioridad, filtroEstado])
 
 const totalIncidencias = todasLasIncidencias.length
 
@@ -122,6 +150,18 @@ const prioridadMedia = todasLasIncidencias.filter(
 
 const prioridadBaja = todasLasIncidencias.filter(
   (incidencia) => incidencia.prioridad === 'Baja'
+).length
+
+const pendientes = todasLasIncidencias.filter(
+  (incidencia) => incidencia.estado === 'Pendiente'
+).length
+
+const enProgreso = todasLasIncidencias.filter(
+  (incidencia) => incidencia.estado === 'En progreso'
+).length
+
+const resueltas = todasLasIncidencias.filter(
+  (incidencia) => incidencia.estado === 'Resuelta'
 ).length
 
 function iniciarEdicion() {
@@ -160,52 +200,50 @@ async function guardarEdicion() {
 
     setIncidenciaSeleccionada(incidenciaActualizada)
 
-    setIncidencias((anteriores) => {
-      let actualizadas = anteriores.map((incidencia) =>
-        incidencia.id === incidenciaActualizada.id
-          ? incidenciaActualizada
-          : incidencia
-      )
 
-      if (
-        filtroPrioridad !== '' &&
-        incidenciaActualizada.prioridad !== filtroPrioridad
-      ) {
-        actualizadas = actualizadas.filter(
-          (incidencia) => incidencia.id !== incidenciaActualizada.id
-        )
-      }
+    const incidenciasActualizadas = todasLasIncidencias.map((incidencia) =>
+      incidencia.id === incidenciaActualizada.id
+        ? incidenciaActualizada
+        : incidencia
+    )
 
-      const ordenPrioridad = {
-        Alta: 1,
-        Media: 2,
-        Baja: 3,
-      }
+    setTodasLasIncidencias(incidenciasActualizadas)
 
-      return actualizadas.sort((a, b) => {
-        const diferenciaPrioridad =
-          ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]
+    const incidenciasFiltradas = incidenciasActualizadas.filter((incidencia) => {
+      const coincidePrioridad =
+        filtroPrioridad === '' || incidencia.prioridad === filtroPrioridad
 
-        if (diferenciaPrioridad !== 0) {
-          return diferenciaPrioridad
-        }
+      const coincideEstado =
+        filtroEstado === '' || incidencia.estado === filtroEstado
 
-        return (
-          new Date(a.fecha_creacion).getTime() -
-          new Date(b.fecha_creacion).getTime()
-        )
-      })
-
-
+      return coincidePrioridad && coincideEstado
     })
 
-    setTodasLasIncidencias((anteriores) =>
-      anteriores.map((incidencia) =>
-        incidencia.id === incidenciaActualizada.id
-          ? incidenciaActualizada
-          : incidencia
-      )
-    )
+    const ordenEstado = {
+      Pendiente: 0,
+      'En progreso': 0,
+      Resuelta: 1,
+    }
+
+    const ordenPrioridad = {
+      Alta: 1,
+      Media: 2,
+      Baja: 3,
+    }
+
+    incidenciasFiltradas.sort((a, b) => {
+      const diferenciaEstado = ordenEstado[a.estado] - ordenEstado[b.estado]
+      if (diferenciaEstado !== 0) return diferenciaEstado
+
+      const diferenciaPrioridad =
+        ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]
+      if (diferenciaPrioridad !== 0) return diferenciaPrioridad
+
+      return new Date(a.fecha_creacion).getTime() -
+        new Date(b.fecha_creacion).getTime()
+    })
+
+    setIncidencias(incidenciasFiltradas)
 
     setModoEdicion(false)
   } catch (error) {
@@ -213,6 +251,57 @@ async function guardarEdicion() {
   }
 }
 
+async function cambiarEstadoIncidencia() {
+  const endpoint =
+    incidenciaSeleccionada.estado === 'Pendiente'
+      ? 'iniciar'
+      : 'resolver'
+
+  try {
+    const respuesta = await fetch(
+      `http://127.0.0.1:8000/incidencias/${incidenciaSeleccionada.id}/${endpoint}`,
+      { method: 'POST' }
+    )
+
+    if (!respuesta.ok) {
+      const errorApi = await respuesta.json()
+      throw new Error(
+        errorApi.detail || 'No se pudo cambiar el estado de la incidencia'
+      )
+    }
+
+    const incidenciaActualizada = await respuesta.json()
+
+   // Actualizar el detalle que está abierto en el modal.
+    setIncidenciaSeleccionada(incidenciaActualizada)
+
+    // Volver a consultar la lista completa y obtener el orden del backend.
+    const respuestaLista = await fetch(
+      'http://127.0.0.1:8000/incidencias'
+    )
+
+    if (!respuestaLista.ok) {
+      throw new Error('No se pudo actualizar la lista de incidencias')
+    }
+
+    const incidenciasActualizadas = await respuestaLista.json()    
+
+    setTodasLasIncidencias(incidenciasActualizadas)
+
+    // Mantener el filtro de prioridad si hay uno activo.
+    if (filtroPrioridad === '') {
+      setIncidencias(incidenciasActualizadas)
+    } else {
+      setIncidencias(
+        incidenciasActualizadas.filter(
+          (incidencia) => incidencia.prioridad === filtroPrioridad
+        )
+      )
+    }
+  } catch (error) {
+    alert(error.message)
+  }
+}
 
 async function eliminarIncidencia() {
   const confirmar = window.confirm(
@@ -308,6 +397,39 @@ return (
       <strong>{prioridadBaja}</strong>
       <p>Menor urgencia</p>
     </article>
+
+    <article className="summary-card">
+      <div className="summary-label">
+        <span>Pendientes</span>
+        <span className="summary-icon icon-alta">
+          <Clock size={20} />
+        </span>
+      </div>
+      <strong>{pendientes}</strong>
+      <p>Esperando atención</p>
+    </article>
+
+    <article className="summary-card">
+      <div className="summary-label">
+        <span>En progreso</span>
+        <span className="summary-icon icon-media">
+          <Clock size={20} />
+        </span>
+      </div>
+      <strong>{enProgreso}</strong>
+      <p>Incidencias en atención</p>
+    </article>
+
+    <article className="summary-card">
+      <div className="summary-label">
+        <span>Resueltas</span>
+        <span className="summary-icon icon-baja">
+          <CheckCircle size={20} />
+        </span>
+      </div>
+      <strong>{resueltas}</strong>
+      <p>Incidencias solucionadas</p>
+    </article>
   </section>
 
 
@@ -371,21 +493,25 @@ return (
   <section className="incidents-panel">
     <div className="incidents-toolbar">
       <h2>Incidencias registradas</h2>
-
-      <div className="filter-control">
-        <label htmlFor="filtro-prioridad">
-          Prioridad:
-        </label>
-
+      <div className="filtros">
         <select
-          id="filtro-prioridad"
           value={filtroPrioridad}
-          onChange={(evento) => setFiltroPrioridad(evento.target.value)}
+          onChange={(e) => setFiltroPrioridad(e.target.value)}
         >
-          <option value="">Todas</option>
+          <option value="">Todas las prioridades</option>
           <option value="Alta">Alta</option>
           <option value="Media">Media</option>
           <option value="Baja">Baja</option>
+        </select>
+
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value)}
+        >
+          <option value="">Todos los estados</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="En progreso">En progreso</option>
+          <option value="Resuelta">Resuelta</option>
         </select>
       </div>
     </div>
@@ -405,6 +531,7 @@ return (
             <th>Título</th>
             <th>Descripción</th>
             <th>Prioridad</th>
+            <th>Estado</th>
             <th>Fecha de creación</th>
           </tr>
         </thead>
@@ -436,6 +563,19 @@ return (
                 }[incidencia.prioridad]}`}
                 >
                   {incidencia.prioridad}
+                </span>
+              </td>
+              <td>
+                <span
+                  className={`status ${
+                    incidencia.estado === 'Pendiente'
+                      ? 'status-pending'
+                      : incidencia.estado === 'En progreso'
+                        ? 'status-progress'
+                        : 'status-resolved'
+                  }`}
+                >
+                  {incidencia.estado}
                 </span>
               </td>
               <td>
@@ -533,6 +673,38 @@ return (
                 </span>
               </p>
 
+              <label>Estado</label>
+              <p>
+                <span
+                  className={`status status-${{
+                    'Pendiente': 'pending',
+                    'En progreso': 'progress',
+                    'Resuelta': 'resolved',
+                  }[incidenciaSeleccionada.estado]}`}
+                >
+                  {incidenciaSeleccionada.estado}
+                </span>
+              </p>
+
+              {incidenciaSeleccionada.fecha_resolucion && (
+                <>
+                  <label>Fecha de resolución</label>
+                  <p>
+                    {new Date(
+                      incidenciaSeleccionada.fecha_resolucion
+                    ).toLocaleString('es-CL', {
+                      timeZone: 'America/Santiago',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    })}
+                  </p>
+                </>
+              )}
+
               <label>Fecha de creación</label>
               <p>
                 {new Date(
@@ -576,6 +748,22 @@ return (
             </>
           ) : (
             <>
+              {incidenciaSeleccionada.estado !== 'Resuelta' && (
+                <button
+                  type="button"
+                  className={
+                  incidenciaSeleccionada.estado === 'Pendiente'
+                    ? 'btn-estado btn-iniciar'
+                    : 'btn-estado btn-resolver'
+                  }
+                  onClick={cambiarEstadoIncidencia}
+                >
+                  {incidenciaSeleccionada.estado === 'Pendiente'
+                    ? 'Iniciar atención'
+                    : 'Resolver incidencia'}
+                </button>
+              )}
+
               <button
                 type="button"
                 className="btn-secondary"

@@ -35,11 +35,21 @@ def inicio():
     return {"mensaje": "Sistema de Gestión de Incidencias"}
 
 
+
 @app.get("/incidencias", response_model=list[IncidenciaRespuesta])
-def listar_incidencias(prioridad: Prioridad | None = None):
-    return obtener_incidencias(
+def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None = None):
+    incidencias = obtener_incidencias(
         prioridad.value if prioridad else None
     )
+
+    if estado is not None:
+        incidencias = [
+            incidencia
+            for incidencia in incidencias
+            if incidencia["estado"] == estado.value
+        ]
+
+    return incidencias
 
 
 @app.get("/incidencias/{id}", response_model=IncidenciaRespuesta)
