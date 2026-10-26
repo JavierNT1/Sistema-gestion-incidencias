@@ -5,6 +5,9 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle,
+  Plus,
+  SlidersHorizontal,
+  X,
 } from 'lucide-react'
 
 function App() {
@@ -50,7 +53,7 @@ if (!respuesta.ok) {
 }
 
 
-const nuevaIncidencia = await respuesta.json()
+await respuesta.json()
 
 // Obtener todas las incidencias con el orden del backend
 const respuestaLista = await fetch(
@@ -356,7 +359,8 @@ return (
       type="button"
       onClick={() => setMostrarFormulario(true)}
     >
-      + Nueva incidencia
+      <Plus size={18} aria-hidden="true" />
+      <span>Nueva incidencia</span>
     </button>
   </header>
 
@@ -494,25 +498,34 @@ return (
     <div className="incidents-toolbar">
       <h2>Incidencias registradas</h2>
       <div className="filtros">
-        <select
-          value={filtroPrioridad}
-          onChange={(e) => setFiltroPrioridad(e.target.value)}
-        >
-          <option value="">Todas las prioridades</option>
-          <option value="Alta">Alta</option>
-          <option value="Media">Media</option>
-          <option value="Baja">Baja</option>
-        </select>
+        <SlidersHorizontal className="filters-icon" size={17} aria-hidden="true" />
+        <div className="filter-control">
+          <label htmlFor="filtro-prioridad">Prioridad</label>
+          <select
+            id="filtro-prioridad"
+            value={filtroPrioridad}
+            onChange={(e) => setFiltroPrioridad(e.target.value)}
+          >
+            <option value="">Todas</option>
+            <option value="Alta">Alta</option>
+            <option value="Media">Media</option>
+            <option value="Baja">Baja</option>
+          </select>
+        </div>
 
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-        >
-          <option value="">Todos los estados</option>
-          <option value="Pendiente">Pendiente</option>
-          <option value="En progreso">En progreso</option>
-          <option value="Resuelta">Resuelta</option>
-        </select>
+        <div className="filter-control">
+          <label htmlFor="filtro-estado">Estado</label>
+          <select
+            id="filtro-estado"
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="En progreso">En progreso</option>
+            <option value="Resuelta">Resuelta</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -545,6 +558,15 @@ return (
             setIncidenciaSeleccionada(incidencia)
             }}
             className="incident-row"
+            tabIndex={0}
+            onKeyDown={(evento) => {
+              if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault()
+                setModoEdicion(false)
+                setIncidenciaSeleccionada(incidencia)
+              }
+            }}
+            aria-label={`Abrir detalle de la incidencia ${incidencia.titulo}`}
             >
               
               <td>{incidencia.id}</td>
@@ -614,6 +636,7 @@ return (
             }}
             aria-label="Cerrar detalle"
           >
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
         <div className="modal-body">
