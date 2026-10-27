@@ -15,6 +15,7 @@ const [incidencias, setIncidencias] = useState([])
 const [todasLasIncidencias, setTodasLasIncidencias] = useState([])
 const [cargando, setCargando] = useState(true)
 const [error, setError] = useState('')
+const [erroresEdicion, setErroresEdicion] = useState({})
 const [mostrarFormulario, setMostrarFormulario] = useState(false)
 const [titulo, setTitulo] = useState('')
 const [descripcion, setDescripcion] = useState('')
@@ -167,7 +168,28 @@ const resueltas = todasLasIncidencias.filter(
   (incidencia) => incidencia.estado === 'Resuelta'
 ).length
 
+function abrirIncidencia(incidencia) {
+  setErroresEdicion({})
+  setModoEdicion(false)
+  setIncidenciaSeleccionada(incidencia)
+}
+
+function cerrarDetalle() {
+  setErroresEdicion({})
+  setModoEdicion(false)
+  setIncidenciaSeleccionada(null)
+}
+
+function cancelarEdicion() {
+  setErroresEdicion({})
+  setModoEdicion(false)
+  setTituloEditado(incidenciaSeleccionada.titulo)
+  setDescripcionEditada(incidenciaSeleccionada.descripcion)
+  setPrioridadEditada(incidenciaSeleccionada.prioridad)
+}
+
 function iniciarEdicion() {
+  setErroresEdicion({})
   setTituloEditado(incidenciaSeleccionada.titulo)
   setDescripcionEditada(incidenciaSeleccionada.descripcion)
   setPrioridadEditada(incidenciaSeleccionada.prioridad)
@@ -176,6 +198,23 @@ function iniciarEdicion() {
 
 
 async function guardarEdicion() {
+  const nuevosErrores = {}
+
+  if (!tituloEditado.trim()) {
+    nuevosErrores.titulo = 'El título no puede estar vacío.'
+  }
+
+  if (!descripcionEditada.trim()) {
+    nuevosErrores.descripcion = 'La descripción no puede estar vacía.'
+  }
+
+  if (Object.keys(nuevosErrores).length > 0) {
+    setErroresEdicion(nuevosErrores)
+    return
+  }
+
+  setErroresEdicion({})
+
   try {
     const respuesta = await fetch(
       `http://127.0.0.1:8000/incidencias/${incidenciaSeleccionada.id}`,
@@ -248,9 +287,10 @@ async function guardarEdicion() {
 
     setIncidencias(incidenciasFiltradas)
 
+    setErroresEdicion({})
     setModoEdicion(false)
   } catch (error) {
-    alert(error.message)
+    setErroresEdicion({ general: error.message })
   }
 }
 
@@ -340,6 +380,7 @@ async function eliminarIncidencia() {
     )
 
     setIncidenciaSeleccionada(null)
+    setErroresEdicion({})
     setModoEdicion(false)
   } catch (error) {
     alert(error.message)
@@ -553,17 +594,13 @@ return (
           {incidencias.map((incidencia) => (
             <tr 
             key={incidencia.id}
-            onClick={() => {
-            setModoEdicion(false)
-            setIncidenciaSeleccionada(incidencia)
-            }}
+            onClick={() => abrirIncidencia(incidencia)}
             className="incident-row"
             tabIndex={0}
             onKeyDown={(evento) => {
               if (evento.key === 'Enter' || evento.key === ' ') {
                 evento.preventDefault()
-                setModoEdicion(false)
-                setIncidenciaSeleccionada(incidencia)
+                abrirIncidencia(incidencia)
               }
             }}
             aria-label={`Abrir detalle de la incidencia ${incidencia.titulo}`}
@@ -619,7 +656,7 @@ return (
     )}
   </section>
   {incidenciaSeleccionada && (
-    <div className="modal-overlay" onClick={() => {setModoEdicion(false) ; setIncidenciaSeleccionada(null)}}>
+    <div className="modal-overlay" onClick={cerrarDetalle}>
       <div
         className="incident-modal"
         onClick={(evento) => evento.stopPropagation()}
@@ -630,10 +667,7 @@ return (
           <button
             type="button"
             className="modal-close"
-            onClick={() => {
-              setModoEdicion(false)
-              setIncidenciaSeleccionada(null)
-            }}
+            onClick={cerrarDetalle}
             aria-label="Cerrar detalle"
           >
             <X size={20} aria-hidden="true" />
@@ -647,20 +681,40 @@ return (
                 id="tituloEditado"
                 type="text"
                 value={tituloEditado}
-                onChange={(evento) => setTituloEditado(evento.target.value)}
+                onChange={(evento) => {
+                  setTituloEditado(evento.target.value)
+                  setErroresEdicion((anteriores) => ({ ...anteriores, titulo: '' }))
+                }}
                 maxLength={200}
+                aria-invalid={Boolean(erroresEdicion.titulo)}
+                aria-describedby={erroresEdicion.titulo ? 'error-titulo-editado' : undefined}
                 required
               />
+              {erroresEdicion.titulo && (
+                <p id="error-titulo-editado" className="error-edicion" role="alert">
+                  {erroresEdicion.titulo}
+                </p>
+              )}
 
               <label htmlFor="descripcionEditada">Descripción</label>
               <textarea
                 id="descripcionEditada"
                 value={descripcionEditada}
-                onChange={(evento) => setDescripcionEditada(evento.target.value)}
+                onChange={(evento) => {
+                  setDescripcionEditada(evento.target.value)
+                  setErroresEdicion((anteriores) => ({ ...anteriores, descripcion: '' }))
+                }}
                 rows={4}
                 maxLength={2000}
+                aria-invalid={Boolean(erroresEdicion.descripcion)}
+                aria-describedby={erroresEdicion.descripcion ? 'error-descripcion-editada' : undefined}
                 required
               />
+              {erroresEdicion.descripcion && (
+                <p id="error-descripcion-editada" className="error-edicion" role="alert">
+                  {erroresEdicion.descripcion}
+                </p>
+              )}
 
               <label htmlFor="prioridadEditada">Prioridad</label>
               <select
@@ -672,6 +726,12 @@ return (
                 <option value="Media">Media</option>
                 <option value="Baja">Baja</option>
               </select>
+
+              {erroresEdicion.general && (
+                <p className="error-edicion" role="alert">
+                  {erroresEdicion.general}
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -751,12 +811,7 @@ return (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  setModoEdicion(false)
-                  setTituloEditado(incidenciaSeleccionada.titulo)
-                  setDescripcionEditada(incidenciaSeleccionada.descripcion)
-                  setPrioridadEditada(incidenciaSeleccionada.prioridad)
-                }}
+                onClick={cancelarEdicion}
               >
                 Cancelar edición
               </button>
@@ -790,10 +845,7 @@ return (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  setModoEdicion(false)
-                  setIncidenciaSeleccionada(null)
-                }}
+                onClick={cerrarDetalle}
               >
                 Cerrar
               </button>
