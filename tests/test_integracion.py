@@ -271,54 +271,80 @@ def test_filtrar_y_ordenar_incidencias_postgresql():
             with conexion.cursor() as cursor:
                 datos = [
                     (
-                        "Prueba orden Baja",
-                        "Descripción de prueba Baja",
+                        "Prueba pendiente Baja",
+                        "Incidencia pendiente de prioridad baja",
                         "Baja",
-                        datetime(2026, 10, 10, tzinfo=timezone.utc)
+                        datetime(2026, 10, 10, tzinfo=timezone.utc),
+                        "Pendiente",
                     ),
                     (
-                        "Prueba orden Alta",
-                        "Descripción de prueba Alta",
+                        "Prueba pendiente Alta antigua",
+                        "Incidencia pendiente de prioridad alta",
                         "Alta",
-                        datetime(2026, 10, 12, tzinfo=timezone.utc)
+                        datetime(2026, 10, 10, tzinfo=timezone.utc),
+                        "Pendiente",
                     ),
                     (
-                        "Prueba orden Media",
-                        "Descripción de prueba Media",
-                        "Media",
-                        datetime(2026, 10, 11, tzinfo=timezone.utc)
+                        "Prueba pendiente Alta reciente",
+                        "Incidencia pendiente de prioridad alta",
+                        "Alta",
+                        datetime(2026, 10, 12, tzinfo=timezone.utc),
+                        "Pendiente",
+                    ),
+                    (
+                        "Prueba progreso Alta",
+                        "Incidencia en progreso",
+                        "Alta",
+                        datetime(2026, 10, 9, tzinfo=timezone.utc),
+                        "En progreso",
+                    ),
+                    (
+                        "Prueba resuelta Alta",
+                        "Incidencia resuelta",
+                        "Alta",
+                        datetime(2026, 10, 8, tzinfo=timezone.utc),
+                        "Resuelta",
                     ),
                 ]
-
-                for titulo, descripcion, prioridad, fecha in datos:
+                for titulo, descripcion, prioridad, fecha, estado in datos:
                     cursor.execute(
                         """
                         INSERT INTO incidencias
-                            (titulo, descripcion, prioridad, fecha_creacion)
-                        VALUES (%s, %s, %s, %s)
+                            (titulo, descripcion, prioridad, fecha_creacion, estado)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING id
                         """,
-                        (titulo, descripcion, prioridad, fecha)
+                        (titulo, descripcion, prioridad, fecha, estado)
                     )
                     ids.append(cursor.fetchone()[0])
 
             conexion.commit()
 
-            # 2. Comprobar el orden por prioridad.
+
+            # 2. Comprobar el orden por estado, prioridad y fecha.
             todas = crud.obtener_incidencias()
             pruebas = [i for i in todas if i["id"] in ids]
 
-            assert [i["prioridad"] for i in pruebas] == [
-                "Alta", "Media", "Baja"
+            assert [i["titulo"] for i in pruebas] == [
+                "Prueba progreso Alta",
+                "Prueba pendiente Alta antigua",
+                "Prueba pendiente Alta reciente",
+                "Prueba pendiente Baja",
+                "Prueba resuelta Alta",
             ]
 
             # 3. Comprobar el filtro por prioridad.
             altas = crud.obtener_incidencias("Alta")
             altas_prueba = [i for i in altas if i["id"] in ids]
 
-            assert len(altas_prueba) == 1
-            assert altas_prueba[0]["titulo"] == "Prueba orden Alta"
-            assert altas_prueba[0]["descripcion"] == "Descripción de prueba Alta"
+            assert len(altas_prueba) == 4
+
+            assert {i["titulo"] for i in altas_prueba} == {
+                "Prueba progreso Alta",
+                "Prueba pendiente Alta antigua",
+                "Prueba pendiente Alta reciente",
+                "Prueba resuelta Alta",
+            }
 
         finally:
             try:
@@ -331,3 +357,39 @@ def test_filtrar_y_ordenar_incidencias_postgresql():
                 conexion.commit()
             finally:
                 conexion.close()
+
+def test_ciclo_completo_y_transiciones_no_permitidas():
+    with patch("app.crud.obtener_conexion", obtener_conexion_pruebas):
+        incidencia = crud.crear_incidencia(
+            titulo="Prueba ciclo de vida",
+            descripcion="Comprobar transiciones de estado",
+            prioridad="Alta",
+        )
+
+        id_incidencia = incidencia["id"]
+
+        try:
+            # La incidencia comienza como Pendiente.
+            assert incidencia["estado"] == "Pendiente"
+
+            # No se puede resolver directamente desde Pendiente.
+            assert crud.resolver_incidencia(id_incidencia) is None
+
+            # Se puede iniciar la atención.
+            en_progreso = crud.iniciar_atencion(id_incidencia)
+            assert en_progreso["estado"] == "En progreso"
+
+            # No se puede iniciar una segunda vez.
+            assert crud.iniciar_atencion(id_incidencia) is None
+
+            # Se puede resolver desde En progreso.
+            resuelta = crud.resolver_incidencia(id_incidencia)
+            assert resuelta["estado"] == "Resuelta"
+            assert resuelta["fecha_resolucion"] is not None
+
+            # No se puede reiniciar ni resolver de nuevo.
+            assert crud.iniciar_atencion(id_incidencia) is None
+            assert crud.resolver_incidencia(id_incidencia) is None
+
+        finally:
+            crud.eliminar_incidencia(id_incidencia)

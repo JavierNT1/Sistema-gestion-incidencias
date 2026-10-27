@@ -58,6 +58,18 @@ def test_rechazar_titulo_vacio():
 
     assert respuesta.status_code == 422
 
+def test_rechazar_descripcion_vacia():
+    respuesta = client.post(
+        "/incidencias",
+        json={
+            "titulo": "Prueba de validación",
+            "descripcion": "   ",
+            "prioridad": "Alta"
+        }
+    )
+
+    assert respuesta.status_code == 422
+
 def test_crear_incidencia():
     incidencia_falsa = {
         **INCIDENCIA_PENDIENTE,
@@ -152,6 +164,22 @@ def test_actualizar_incidencia():
         "El sistema no responde",
         "Media"
     )
+
+def test_rechazar_descripcion_vacia_al_actualizar():
+    with patch(
+        "app.main.actualizar_incidencia"
+    ) as actualizar_mock:
+        respuesta = client.put(
+            "/incidencias/1",
+            json={
+                "titulo": "Título válido",
+                "descripcion": "   ",
+                "prioridad": "Alta"
+            }
+        )
+
+    assert respuesta.status_code == 422
+    actualizar_mock.assert_not_called()
 
 
 def test_eliminar_incidencia():
@@ -318,3 +346,25 @@ def test_resolver_incidencia_estado_incorrecto():
             "no está en progreso"
         )
     }
+
+    
+def test_ciclo_completo_de_incidencia():
+    with patch(
+        "app.main.iniciar_atencion",
+        return_value=INCIDENCIA_EN_PROGRESO
+    ) as iniciar_mock, patch(
+        "app.main.resolver_incidencia",
+        return_value=INCIDENCIA_RESUELTA
+    ) as resolver_mock:
+        respuesta_iniciar = client.post("/incidencias/1/iniciar")
+
+        assert respuesta_iniciar.status_code == 200
+        assert respuesta_iniciar.json()["estado"] == "En progreso"
+
+        respuesta_resolver = client.post("/incidencias/1/resolver")
+
+        assert respuesta_resolver.status_code == 200
+        assert respuesta_resolver.json()["estado"] == "Resuelta"
+
+        iniciar_mock.assert_called_once_with(1)
+        resolver_mock.assert_called_once_with(1)
