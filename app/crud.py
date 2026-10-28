@@ -1,4 +1,3 @@
-
 from conexion import obtener_conexion
 
 
@@ -113,7 +112,9 @@ def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
             "estado": fila[5],
             "fecha_resolucion": fila[6],
         }
-
+    except Exception:
+        conexion.rollback()
+        raise
     finally:
         conexion.close()
 
@@ -153,7 +154,10 @@ def actualizar_incidencia(
             }
 
         return None
-
+    
+    except Exception:
+        conexion.rollback()
+        raise
     finally:
         conexion.close()
 
@@ -187,7 +191,10 @@ def eliminar_incidencia(id: int):
             "estado": fila[5],
             "fecha_resolucion": fila[6],
         }
-
+    
+    except Exception:
+        conexion.rollback()
+        raise
     finally:
         conexion.close()
 
@@ -230,7 +237,9 @@ def iniciar_atencion(id: int):
             "estado": fila[5],
             "fecha_resolucion": fila[6],
         }
-
+    except Exception:
+        conexion.rollback()
+        raise
     finally:
         conexion.close()
 
@@ -275,6 +284,9 @@ def resolver_incidencia(id: int):
             "estado": fila[5],
             "fecha_resolucion": fila[6],
         }
-
+    
+    except Exception:
+        conexion.rollback()
+        raise
     finally:
         conexion.close()

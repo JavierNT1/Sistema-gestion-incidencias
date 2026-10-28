@@ -368,3 +368,44 @@ def test_ciclo_completo_de_incidencia():
 
         iniciar_mock.assert_called_once_with(1)
         resolver_mock.assert_called_once_with(1)
+
+def test_filtrar_incidencias_por_estado():
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1},
+        {**INCIDENCIA_EN_PROGRESO, "id": 2},
+        {**INCIDENCIA_RESUELTA, "id": 3},
+    ]
+
+    with patch("app.main.obtener_incidencias", return_value=incidencias):
+        respuesta = client.get("/incidencias?estado=En%20progreso")
+
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+
+    assert len(datos) == 1
+    assert datos[0]["id"] == 2
+    assert datos[0]["estado"] == "En progreso"
+
+
+def test_consultar_incidencia_existente():
+    with patch(
+        "app.main.obtener_incidencia_por_id",
+        return_value=INCIDENCIA_PENDIENTE
+    ) as obtener_mock:
+        respuesta = client.get("/incidencias/1")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == INCIDENCIA_PENDIENTE
+    obtener_mock.assert_called_once_with(1)
+
+def test_rechazar_titulo_muy_largo():
+    respuesta = client.post(
+        "/incidencias",
+        json={
+            "titulo": "A" * 201,
+            "descripcion": "Descripción de prueba",
+            "prioridad": "Alta",
+        },
+    )
+
+    assert respuesta.status_code == 422

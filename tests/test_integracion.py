@@ -1,7 +1,8 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 from conexion import obtener_conexion_pruebas
 from app import crud
+import pytest
 
 def test_conexion_postgresql():
     conexion = obtener_conexion_pruebas()
@@ -252,6 +253,8 @@ def test_crud_actualizar_incidencia():
             assert actualizada["descripcion"] == "Descripción actualizada"
             assert actualizada["prioridad"] == "Alta"
             assert actualizada["fecha_creacion"] == incidencia["fecha_creacion"]
+            guardada = crud.obtener_incidencia_por_id(incidencia["id"])
+            assert guardada == actualizada
 
         finally:
             crud.eliminar_incidencia(incidencia["id"])
@@ -324,7 +327,7 @@ def test_filtrar_y_ordenar_incidencias_postgresql():
             # 2. Comprobar el orden por estado, prioridad y fecha.
             todas = crud.obtener_incidencias()
             pruebas = [i for i in todas if i["id"] in ids]
-
+            assert len(pruebas) == 5
             assert [i["titulo"] for i in pruebas] == [
                 "Prueba progreso Alta",
                 "Prueba pendiente Alta antigua",
@@ -393,3 +396,116 @@ def test_ciclo_completo_y_transiciones_no_permitidas():
 
         finally:
             crud.eliminar_incidencia(id_incidencia)
+
+
+def test_crud_consultar_incidencia_inexistente():
+    with patch("app.crud.obtener_conexion", obtener_conexion_pruebas):
+        incidencia = crud.obtener_incidencia_por_id(-1)
+
+    assert incidencia is None
+
+
+def test_crud_eliminar_incidencia_inexistente():
+    with patch("app.crud.obtener_conexion", obtener_conexion_pruebas):
+        eliminada = crud.eliminar_incidencia(-1)
+
+    assert eliminada is None
+
+
+def test_crud_actualizar_incidencia_inexistente():
+    with patch("app.crud.obtener_conexion", obtener_conexion_pruebas):
+        resultado = crud.actualizar_incidencia(
+            id=-1,
+            titulo="Título actualizado",
+            descripcion="Descripción actualizada",
+            prioridad="Alta",
+        )
+
+    assert resultado is None
+
+def test_obtener_incidencias_cierra_conexion_si_falla_consulta():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception("Error simulado de PostgreSQL")
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.obtener_incidencias()
+
+    conexion_falsa.close.assert_called_once()
+
+def test_crear_incidencia_cierra_conexion_si_falla_insert():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception("Error simulado de PostgreSQL")
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.crear_incidencia(
+                "Incidencia de prueba",
+                "Descripción de prueba",
+                "Alta",
+            )
+
+    conexion_falsa.close.assert_called_once()
+    conexion_falsa.rollback.assert_called_once()
+
+
+def test_actualizar_incidencia_revierte_si_falla_consulta():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception("Error simulado de PostgreSQL")
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.actualizar_incidencia(
+                1,
+                "Título actualizado",
+                "Descripción actualizada",
+                "Alta",
+            )
+
+    conexion_falsa.rollback.assert_called_once()
+    conexion_falsa.close.assert_called_once()
+
+def test_eliminar_incidencia_revierte_si_falla_consulta():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception(
+        "Error simulado de PostgreSQL"
+    )
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.eliminar_incidencia(1)
+
+    conexion_falsa.rollback.assert_called_once()
+    conexion_falsa.close.assert_called_once()
+
+def test_iniciar_atencion_revierte_si_falla_consulta():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception(
+        "Error simulado de PostgreSQL"
+    )
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.iniciar_atencion(1)
+
+    conexion_falsa.rollback.assert_called_once()
+    conexion_falsa.close.assert_called_once()
+
+def test_resolver_incidencia_revierte_si_falla_consulta():
+    conexion_falsa = MagicMock()
+    cursor_falso = conexion_falsa.cursor.return_value.__enter__.return_value
+    cursor_falso.execute.side_effect = Exception(
+        "Error simulado de PostgreSQL"
+    )
+
+    with patch("app.crud.obtener_conexion", return_value=conexion_falsa):
+        with pytest.raises(Exception, match="Error simulado de PostgreSQL"):
+            crud.resolver_incidencia(1)
+
+    conexion_falsa.rollback.assert_called_once()
+    conexion_falsa.close.assert_called_once()   
