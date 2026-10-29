@@ -638,3 +638,118 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Gráfico de distribución por estado */
+
+.chart-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.chart-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.chart-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.chart-content {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.chart-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.chart-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.chart-legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chart-legend-item strong {
+  margin-left: auto;
+  color: #0f172a;
+}
+
+.chart-percentage {
+  color: #64748b;
+  min-width: 42px;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .chart-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chart-container,
+  .chart-legend {
+    width: 100%;
+  }
+}
+
+/* Distribución de los dos gráficos */
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.charts-grid .chart-panel {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.charts-grid .chart-content {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.charts-grid .chart-container {
+  width: 100%;
+  flex: none;
+}
+
+.charts-grid .chart-legend {
+  width: 100%;
+  flex: none;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}

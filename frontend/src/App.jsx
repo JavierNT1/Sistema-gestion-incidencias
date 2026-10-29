@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
+import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
 
 function App() {
 const [incidencias, setIncidencias] = useState([])
@@ -167,6 +168,18 @@ const enProgreso = todasLasIncidencias.filter(
 const resueltas = todasLasIncidencias.filter(
   (incidencia) => incidencia.estado === 'Resuelta'
 ).length
+
+const datosGraficoEstados = [
+  { nombre: 'Pendientes', cantidad: pendientes, color: '#F59E0B' },
+  { nombre: 'En progreso', cantidad: enProgreso, color: '#3B82F6' },
+  { nombre: 'Resueltas', cantidad: resueltas, color: '#22C55E' },
+]
+
+const datosGraficoPrioridades = [
+  { nombre: 'Alta', cantidad: prioridadAlta, color: '#EF4444' },
+  { nombre: 'Media', cantidad: prioridadMedia, color: '#F59E0B' },
+  { nombre: 'Baja', cantidad: prioridadBaja, color: '#22C55E' },
+]
 
 function abrirIncidencia(incidencia) {
   setErroresEdicion({})
@@ -477,6 +490,108 @@ return (
     </article>
   </section>
 
+  <section className="charts-grid">
+    {[
+      {
+        titulo: 'Incidencias por estado',
+        descripcion: 'Distribución según el estado actual',
+        datos: datosGraficoEstados,
+      },
+      {
+        titulo: 'Incidencias por prioridad',
+        descripcion: 'Distribución según el nivel de urgencia',
+        datos: datosGraficoPrioridades,
+      },
+    ].map((grafico) => (
+      <article className="chart-panel" key={grafico.titulo}>
+        <div className="chart-header">
+          <h2>{grafico.titulo}</h2>
+          <p>{grafico.descripcion}</p>
+        </div>
+
+        <div className="chart-content">
+          <div className="chart-container">
+            {totalIncidencias > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={grafico.datos}
+                    dataKey="cantidad"
+                    nameKey="nombre"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {grafico.datos.map((dato) => (
+                      <Cell key={dato.nombre} fill={dato.color} />
+                    ))}
+                    <Label
+                      content={({ viewBox }) => {
+                        if (!viewBox || !('cx' in viewBox)) return null
+
+                        const { cx, cy } = viewBox
+
+                        return (
+                          <text
+                            x={cx}
+                            y={cy}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            <tspan
+                              x={cx}
+                              dy="-7"
+                              fontSize="28"
+                              fontWeight="700"
+                              fill="#0f172a"
+                            >
+                              {totalIncidencias}
+                            </tspan>
+                            <tspan
+                              x={cx}
+                              dy="22"
+                              fontSize="11"
+                              fill="#64748b"
+                            >
+                              Incidencias
+                            </tspan>
+                          </text>
+                        )
+                      }}
+                    />
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p>No hay incidencias para mostrar.</p>
+            )}
+          </div>
+
+          <div className="chart-legend">
+            {grafico.datos.map((dato) => (
+              <div className="chart-legend-item" key={dato.nombre}>
+                <span
+                  className="chart-legend-color"
+                  style={{ backgroundColor: dato.color }}
+                />
+                <span>{dato.nombre}</span>
+                <strong>{dato.cantidad}</strong>
+                <span className="chart-percentage">
+                  {totalIncidencias > 0
+                    ? `${Math.round((dato.cantidad / totalIncidencias) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </article>
+    ))}
+  </section>
 
   {mostrarFormulario && (
     <section className="incidents-panel form-panel">
