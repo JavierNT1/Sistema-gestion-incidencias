@@ -12,13 +12,20 @@ class Estado(str, Enum):
     EN_PROGRESO = "En progreso"
     RESUELTA = "Resuelta"
 
-#Lo que el cliente nos envía.
+class Categoria(str, Enum):
+    INFORMATICA = "Informática (TI)"
+    MANTENIMIENTO = "Mantenimiento e instalaciones"
+    SEGURIDAD = "Seguridad"
+    ADMINISTRACION = "Administración"
+    OPERACIONES = "Operaciones y logística"
+    OTROS = "Otros"
 
+#Lo que el cliente nos envía.
 class IncidenciaNueva(BaseModel):
     titulo: str
+    categoria: Categoria
     descripcion: str
     prioridad: Prioridad
-
     @field_validator("titulo")
     @classmethod
     def validar_titulo(cls, valor):
@@ -58,6 +65,7 @@ class IncidenciaRespuesta(BaseModel):
     titulo: str
     descripcion: str 
     prioridad: Prioridad
+    categoria: Categoria
     fecha_creacion: datetime
     estado: Estado
     fecha_resolucion: datetime | None = None

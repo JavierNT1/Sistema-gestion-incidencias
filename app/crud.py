@@ -7,7 +7,7 @@ def obtener_incidencias(prioridad: str | None = None):
     try:
         with conexion.cursor() as cursor:
             consulta = """
-                SELECT id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
+                SELECT id, titulo, categoria, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 FROM incidencias
             """
             parametros = ()
@@ -40,11 +40,12 @@ def obtener_incidencias(prioridad: str | None = None):
             incidencia = {
                 "id": fila[0],
                 "titulo": fila[1],
-                "descripcion": fila[2],
-                "prioridad": fila[3],
-                "fecha_creacion": fila[4],
-                "estado": fila[5],
-                "fecha_resolucion": fila[6],
+                "categoria": fila[2],
+                "descripcion": fila[3],
+                "prioridad": fila[4],
+                "fecha_creacion": fila[5],
+                "estado": fila[6],
+                "fecha_resolucion": fila[7],
             }
             resultado.append(incidencia)
 
@@ -61,7 +62,7 @@ def obtener_incidencia_por_id(id: int):
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
+                SELECT id, titulo, categoria, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 FROM incidencias
                 WHERE id = %s
                 """,
@@ -75,29 +76,30 @@ def obtener_incidencia_por_id(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "descripcion": fila[2],
-            "prioridad": fila[3],
-            "fecha_creacion": fila[4],
-            "estado": fila[5],
-            "fecha_resolucion": fila[6],
+            "categoria": fila[2],
+            "descripcion": fila[3],
+            "prioridad": fila[4],
+            "fecha_creacion": fila[5],
+            "estado": fila[6],
+            "fecha_resolucion": fila[7],
         }
 
     finally:
         conexion.close()
 
 
-def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
+def crear_incidencia(titulo: str, categoria: str, descripcion: str, prioridad: str):
     conexion = obtener_conexion()
 
     try:
         with conexion.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO incidencias (titulo, descripcion, prioridad)
-                VALUES (%s, %s, %s)
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
+                INSERT INTO incidencias (titulo, categoria, descripcion, prioridad)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id, titulo, categoria, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion
                 """,
-                (titulo, descripcion, prioridad),
+                (titulo, categoria, descripcion, prioridad),
             )
             fila = cursor.fetchone()
 
@@ -106,11 +108,12 @@ def crear_incidencia(titulo: str, descripcion: str, prioridad: str):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "descripcion": fila[2],
-            "prioridad": fila[3],
-            "fecha_creacion": fila[4],
-            "estado": fila[5],
-            "fecha_resolucion": fila[6],
+            "categoria": fila[2],
+            "descripcion": fila[3],
+            "prioridad": fila[4],
+            "fecha_creacion": fila[5],
+            "estado": fila[6],
+            "fecha_resolucion": fila[7],
         }
     except Exception:
         conexion.rollback()
@@ -134,9 +137,9 @@ def actualizar_incidencia(
                 UPDATE incidencias
                 SET titulo = %s, descripcion = %s, prioridad = %s
                 WHERE id = %s
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
+                RETURNING id, titulo, categoria, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
                 """,
-                (titulo, descripcion, prioridad, id),
+                (titulo,descripcion, prioridad, id),
             )
             fila = cursor.fetchone()
 
@@ -146,11 +149,12 @@ def actualizar_incidencia(
             return {
                 "id": fila[0],
                 "titulo": fila[1],
-                "descripcion": fila[2],
-                "prioridad": fila[3],
-                "fecha_creacion": fila[4],
-                "estado": fila[5],
-                "fecha_resolucion": fila[6],
+                "categoria": fila[2],                
+                "descripcion": fila[3],
+                "prioridad": fila[4],
+                "fecha_creacion": fila[5],
+                "estado": fila[6],
+                "fecha_resolucion": fila[7],
             }
 
         return None
@@ -171,7 +175,7 @@ def eliminar_incidencia(id: int):
                 """
                 DELETE FROM incidencias
                 WHERE id = %s
-                RETURNING id, titulo, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
+                RETURNING id, titulo, categoria, descripcion, prioridad, fecha_creacion, estado, fecha_resolucion 
                 """,
                 (id,),
             )
@@ -185,11 +189,12 @@ def eliminar_incidencia(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "descripcion": fila[2],
-            "prioridad": fila[3],
-            "fecha_creacion": fila[4],
-            "estado": fila[5],
-            "fecha_resolucion": fila[6],
+            "categoria": fila[2],
+            "descripcion": fila[3],
+            "prioridad": fila[4],
+            "fecha_creacion": fila[5],
+            "estado": fila[6],
+            "fecha_resolucion": fila[7],
         }
     
     except Exception:
@@ -213,6 +218,7 @@ def iniciar_atencion(id: int):
                 RETURNING
                     id,
                     titulo,
+                    categoria,
                     descripcion,
                     prioridad,
                     fecha_creacion,
@@ -231,11 +237,12 @@ def iniciar_atencion(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "descripcion": fila[2],
-            "prioridad": fila[3],
-            "fecha_creacion": fila[4],
-            "estado": fila[5],
-            "fecha_resolucion": fila[6],
+            "categoria": fila[2],
+            "descripcion": fila[3],
+            "prioridad": fila[4],
+            "fecha_creacion": fila[5],
+            "estado": fila[6],
+            "fecha_resolucion": fila[7],
         }
     except Exception:
         conexion.rollback()
@@ -260,6 +267,7 @@ def resolver_incidencia(id: int):
                 RETURNING
                     id,
                     titulo,
+                    categoria,
                     descripcion,
                     prioridad,
                     fecha_creacion,
@@ -278,11 +286,12 @@ def resolver_incidencia(id: int):
         return {
             "id": fila[0],
             "titulo": fila[1],
-            "descripcion": fila[2],
-            "prioridad": fila[3],
-            "fecha_creacion": fila[4],
-            "estado": fila[5],
-            "fecha_resolucion": fila[6],
+            "categoria": fila[2],
+            "descripcion": fila[3],
+            "prioridad": fila[4],
+            "fecha_creacion": fila[5],
+            "estado": fila[6],
+            "fecha_resolucion": fila[7],
         }
     
     except Exception:

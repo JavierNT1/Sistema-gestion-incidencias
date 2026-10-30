@@ -19,10 +19,12 @@ const [error, setError] = useState('')
 const [erroresEdicion, setErroresEdicion] = useState({})
 const [mostrarFormulario, setMostrarFormulario] = useState(false)
 const [titulo, setTitulo] = useState('')
+const [categoria, setCategoria] = useState('')
 const [descripcion, setDescripcion] = useState('')
 const [prioridad, setPrioridad] = useState('Media')
 const [filtroPrioridad, setFiltroPrioridad] = useState('')
 const [filtroEstado, setFiltroEstado] = useState('')
+const [filtroCategoria, setFiltroCategoria] = useState('')
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
@@ -42,6 +44,7 @@ headers: {
 },
 body: JSON.stringify({
 titulo: titulo,
+categoria: categoria,
 descripcion: descripcion,
 prioridad: prioridad,
 }),
@@ -87,6 +90,7 @@ const incidenciasFiltradas = todas.filter((incidencia) => {
 setIncidencias(incidenciasFiltradas)
 
 setTitulo('')
+setCategoria('')
 setDescripcion('')
 setPrioridad('Media')
 setMostrarFormulario(false)
@@ -144,6 +148,9 @@ cargarIncidencias()
 }, [filtroPrioridad, filtroEstado])
 
 const totalIncidencias = todasLasIncidencias.length
+const incidenciasVisibles = incidencias.filter(
+  (incidencia) => filtroCategoria === '' || incidencia.categoria === filtroCategoria
+)
 
 const prioridadAlta = todasLasIncidencias.filter(
   (incidencia) => incidencia.prioridad === 'Alta'
@@ -238,6 +245,7 @@ async function guardarEdicion() {
         },
         body: JSON.stringify({
           titulo: tituloEditado,
+          categoria: incidenciaSeleccionada.categoria,
           descripcion: descripcionEditada,
           prioridad: prioridadEditada,
         }),
@@ -344,16 +352,18 @@ async function cambiarEstadoIncidencia() {
 
     setTodasLasIncidencias(incidenciasActualizadas)
 
-    // Mantener el filtro de prioridad si hay uno activo.
-    if (filtroPrioridad === '') {
-      setIncidencias(incidenciasActualizadas)
-    } else {
-      setIncidencias(
-        incidenciasActualizadas.filter(
-          (incidencia) => incidencia.prioridad === filtroPrioridad
-        )
-      )
-    }
+    // Mantener ambos filtros y el orden recibido del backend.
+    const incidenciasFiltradas = incidenciasActualizadas.filter((incidencia) => {
+      const coincidePrioridad =
+        filtroPrioridad === '' || incidencia.prioridad === filtroPrioridad
+
+      const coincideEstado =
+        filtroEstado === '' || incidencia.estado === filtroEstado
+
+      return coincidePrioridad && coincideEstado
+    })
+
+    setIncidencias(incidenciasFiltradas)
   } catch (error) {
     alert(error.message)
   }
@@ -610,6 +620,23 @@ return (
           maxLength={200}
           required
         />
+        <label htmlFor="categoria">Categoría</label>
+
+        <select
+          id="categoria"
+          value={categoria}
+          onChange={(evento) => setCategoria(evento.target.value)}
+          required
+        >
+          <option value="">Selecciona una categoría</option>
+          <option value="Informática (TI)">Informática (TI)</option>
+          <option value="Mantenimiento e instalaciones">Mantenimiento e instalaciones</option>
+          <option value="Seguridad">Seguridad</option>
+          <option value="Administración">Administración</option>
+          <option value="Operaciones y logística">Operaciones y logística</option>
+          <option value="Otros">Otros</option>
+        </select>
+
         <label htmlFor="descripcion">Descripción del problema</label>
 
         <textarea
@@ -655,33 +682,56 @@ return (
       <h2>Incidencias registradas</h2>
       <div className="filtros">
         <SlidersHorizontal className="filters-icon" size={17} aria-hidden="true" />
-        <div className="filter-control">
-          <label htmlFor="filtro-prioridad">Prioridad</label>
-          <select
-            id="filtro-prioridad"
-            value={filtroPrioridad}
-            onChange={(e) => setFiltroPrioridad(e.target.value)}
-          >
-            <option value="">Todas</option>
-            <option value="Alta">Alta</option>
-            <option value="Media">Media</option>
-            <option value="Baja">Baja</option>
-          </select>
-        </div>
-
-        <div className="filter-control">
-          <label htmlFor="filtro-estado">Estado</label>
-          <select
-            id="filtro-estado"
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-          >
-            <option value="">Todos</option>
-            <option value="Pendiente">Pendiente</option>
-            <option value="En progreso">En progreso</option>
-            <option value="Resuelta">Resuelta</option>
-          </select>
-        </div>
+        {[
+          { nombre: 'Categoría', valor: filtroCategoria, cambiar: setFiltroCategoria,
+            opciones: ['Informática (TI)', 'Mantenimiento e instalaciones', 'Seguridad',
+              'Administración', 'Operaciones y logística', 'Otros'] },
+          { nombre: 'Prioridad', valor: filtroPrioridad, cambiar: setFiltroPrioridad,
+            opciones: ['Alta', 'Media', 'Baja'] },
+          { nombre: 'Estado', valor: filtroEstado, cambiar: setFiltroEstado,
+            opciones: ['Pendiente', 'En progreso', 'Resuelta'] },
+        ].map(({ nombre, valor, cambiar, opciones }) => (
+          <details className="filter-chip" name="filtros-incidencias" key={nombre}
+            onToggle={(evento) => {
+              if (evento.currentTarget.open) {
+                evento.currentTarget.parentElement.querySelectorAll('details').forEach((detalle) => {
+                  if (detalle !== evento.currentTarget) detalle.removeAttribute('open')
+                })
+              }
+            }}
+            onKeyDown={(evento) => {
+              if (evento.key === 'Escape') {
+                evento.currentTarget.removeAttribute('open')
+                evento.currentTarget.querySelector('summary').focus()
+              }
+            }}>
+            <summary className={valor ? 'is-active' : ''}>
+              {valor && <span aria-hidden="true">✓ </span>}
+              {nombre}{valor ? `: ${valor}` : ''}
+              <span className="chip-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <div className="chip-options" role="group" aria-label={`Filtrar por ${nombre.toLowerCase()}`}>
+              {opciones.map((opcion) => (
+                <button type="button" key={opcion} aria-pressed={valor === opcion}
+                  onClick={(evento) => {
+                    cambiar(valor === opcion ? '' : opcion)
+                    const detalle = evento.currentTarget.closest('details')
+                    detalle.removeAttribute('open')
+                    detalle.querySelector('summary').focus()
+                  }}>
+                  {opcion}<span aria-hidden="true">{valor === opcion ? '✓' : ''}</span>
+                </button>
+              ))}
+            </div>
+          </details>
+        ))}
+        {(filtroPrioridad || filtroEstado || filtroCategoria) && (
+          <button type="button" className="filters-clear" onClick={() => {
+            setFiltroPrioridad('')
+            setFiltroEstado('')
+            setFiltroCategoria('')
+          }}>Limpiar filtros</button>
+        )}
       </div>
     </div>
 
@@ -690,14 +740,16 @@ return (
       <p className="message">Cargando incidencias...</p>
     ) : error ? (
       <p className="message error">{error}</p>
-    ) : incidencias.length === 0 ? (
+    ) : incidenciasVisibles.length === 0 ? (
       <p className="message">No hay incidencias registradas.</p>
     ) : (
+      <div className="incidents-table-scroll">
       <table className="incidents-table">
         <thead>
           <tr>
             <th>ID</th>
             <th>Título</th>
+            <th>Categoría</th>
             <th>Descripción</th>
             <th>Prioridad</th>
             <th>Estado</th>
@@ -706,7 +758,7 @@ return (
         </thead>
 
         <tbody>
-          {incidencias.map((incidencia) => (
+          {incidenciasVisibles.map((incidencia) => (
             <tr 
             key={incidencia.id}
             onClick={() => abrirIncidencia(incidencia)}
@@ -723,6 +775,7 @@ return (
               
               <td>{incidencia.id}</td>
               <td>{incidencia.titulo}</td>
+              <td>{incidencia.categoria}</td>
               <td className="description-cell">
                 {incidencia.descripcion.length > 70
                   ? `${incidencia.descripcion.slice(0, 70)}...`
@@ -768,6 +821,7 @@ return (
           ))}
         </tbody>
       </table>
+      </div>
     )}
   </section>
   {incidenciaSeleccionada && (
@@ -852,6 +906,9 @@ return (
             <>
               <label>Título</label>
               <p>{incidenciaSeleccionada.titulo}</p>
+
+              <label>Categoría</label>
+              <p>{incidenciaSeleccionada.categoria}</p>
 
               <label>Descripción</label>
               <p className="modal-description">

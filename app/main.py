@@ -16,6 +16,7 @@ from app.schemas import (
     IncidenciaRespuesta,
     Prioridad,
     Estado,
+    Categoria,
 )
 
 app = FastAPI()
@@ -37,7 +38,7 @@ def inicio():
 
 
 @app.get("/incidencias", response_model=list[IncidenciaRespuesta])
-def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None = None):
+def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None = None, categoria: Categoria | None = None):
     incidencias = obtener_incidencias(
         prioridad.value if prioridad else None
     )
@@ -48,7 +49,12 @@ def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None
             for incidencia in incidencias
             if incidencia["estado"] == estado.value
         ]
-
+    if categoria is not None:
+        incidencias = [
+            incidencia
+            for incidencia in incidencias
+            if incidencia["categoria"] == categoria.value
+        ]
     return incidencias
 
 
@@ -69,6 +75,7 @@ def consultar_incidencia(id: int):
 def crear_incidencia_endpoint(incidencia: IncidenciaNueva):
     return crear_incidencia(
         incidencia.titulo,
+        incidencia.categoria.value,
         incidencia.descripcion,
         incidencia.prioridad.value
     )
