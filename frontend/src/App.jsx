@@ -25,6 +25,7 @@ const [prioridad, setPrioridad] = useState('Media')
 const [filtroPrioridad, setFiltroPrioridad] = useState('')
 const [filtroEstado, setFiltroEstado] = useState('')
 const [filtroCategoria, setFiltroCategoria] = useState('')
+const [busquedaId, setBusquedaId] = useState('')
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
@@ -148,9 +149,15 @@ cargarIncidencias()
 }, [filtroPrioridad, filtroEstado])
 
 const totalIncidencias = todasLasIncidencias.length
-const incidenciasVisibles = incidencias.filter(
-  (incidencia) => filtroCategoria === '' || incidencia.categoria === filtroCategoria
-)
+const incidenciasVisibles = incidencias.filter((incidencia) => {
+  const coincideCategoria =
+    filtroCategoria === '' || incidencia.categoria === filtroCategoria
+
+  const coincideId =
+    busquedaId === '' || incidencia.id === Number(busquedaId)
+
+  return coincideCategoria && coincideId
+})
 
 const prioridadAlta = todasLasIncidencias.filter(
   (incidencia) => incidencia.prioridad === 'Alta'
@@ -680,7 +687,28 @@ return (
   <section className="incidents-panel">
     <div className="incidents-toolbar">
       <h2>Incidencias registradas</h2>
-      <div className="filtros">
+          <div className="filtros">
+        <div className="search-id-wrapper">
+              <input
+          type="number"
+          min="1"
+          placeholder="Buscar ID..."
+          aria-label="Buscar incidencia por ID"
+          value={busquedaId}
+          onChange={(evento) => setBusquedaId(evento.target.value)}
+          className="search-id"
+        />
+          {busquedaId !== '' && (
+            <button type="button" className="search-id-clear"
+              aria-label="Limpiar búsqueda por ID"
+              onClick={(evento) => {
+                setBusquedaId('')
+                evento.currentTarget.parentElement.querySelector('input').focus()
+              }}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
+        </div>
         <SlidersHorizontal className="filters-icon" size={17} aria-hidden="true" />
         {[
           { nombre: 'Categoría', valor: filtroCategoria, cambiar: setFiltroCategoria,
@@ -725,11 +753,12 @@ return (
             </div>
           </details>
         ))}
-        {(filtroPrioridad || filtroEstado || filtroCategoria) && (
+        {(filtroPrioridad || filtroEstado || filtroCategoria || busquedaId) && (
           <button type="button" className="filters-clear" onClick={() => {
             setFiltroPrioridad('')
             setFiltroEstado('')
             setFiltroCategoria('')
+            setBusquedaId('')
           }}>Limpiar filtros</button>
         )}
       </div>

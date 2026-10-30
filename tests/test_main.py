@@ -4,7 +4,36 @@ from unittest.mock import patch
 
 client = TestClient(app)
 
+
+def test_categoria_obligatoria_e_invalida():
+    for metodo, endpoint, mock_name in [
+        ('post', '/incidencias', 'crear_incidencia'),
+        ('put', '/incidencias/1', 'actualizar_incidencia'),
+    ]:
+        for categoria in [None, 'No existe', '']:
+            datos = {'titulo': 'Prueba', 'descripcion': 'Descripción', 'prioridad': 'Alta'}
+            if categoria is not None:
+                datos['categoria'] = categoria
+            with patch(f'app.main.{mock_name}') as operacion:
+                respuesta = getattr(client, metodo)(endpoint, json=datos)
+            assert respuesta.status_code == 422
+            assert any(error['loc'] == ['body', 'categoria'] for error in respuesta.json()['detail'])
+            operacion.assert_not_called()
+
+
+def test_editar_no_cambia_categoria():
+    original = {**INCIDENCIA_PENDIENTE, 'categoria': 'Seguridad'}
+    with patch('app.main.actualizar_incidencia', return_value=original) as actualizar:
+        respuesta = client.put('/incidencias/1', json={
+            'titulo': original['titulo'], 'descripcion': original['descripcion'],
+            'prioridad': original['prioridad'], 'categoria': 'Otros',
+        })
+    assert respuesta.status_code == 200
+    assert respuesta.json()['categoria'] == 'Seguridad'
+    actualizar.assert_called_once_with(1, original['titulo'], original['descripcion'], 'Alta')
+
 INCIDENCIA_PENDIENTE = {
+                           "categoria": "Otros",
     "id": 1,
     "titulo": "Error de conexión",
     "descripcion": "El sistema no responde",
@@ -38,6 +67,7 @@ def test_rechazar_prioridad_invalida():
     respuesta = client.post(
         "/incidencias",
         json={
+                 "categoria": "Otros",
             "titulo": "Prueba de validación",
             "descripcion": "Descripción de prueba",
             "prioridad": "Urgente"
@@ -50,6 +80,7 @@ def test_rechazar_titulo_vacio():
     respuesta = client.post(
         "/incidencias",
         json={
+                 "categoria": "Otros",
             "titulo": "   ",
             "descripcion": "Descripción de prueba",
             "prioridad": "Alta"
@@ -62,6 +93,7 @@ def test_rechazar_descripcion_vacia():
     respuesta = client.post(
         "/incidencias",
         json={
+                 "categoria": "Otros",
             "titulo": "Prueba de validación",
             "descripcion": "   ",
             "prioridad": "Alta"
@@ -72,6 +104,7 @@ def test_rechazar_descripcion_vacia():
 
 def test_crear_incidencia():
     incidencia_falsa = {
+                           "categoria": "Otros",
         **INCIDENCIA_PENDIENTE,
         "id": 100,
         "titulo": "Error en el sistema",
@@ -84,6 +117,7 @@ def test_crear_incidencia():
         respuesta = client.post(
             "/incidencias",
             json={
+                     "categoria": "Otros",
                 "titulo": "Error en el sistema",
                 "descripcion": "El sistema no responde",
                 "prioridad": "Alta"
@@ -94,6 +128,7 @@ def test_crear_incidencia():
     assert respuesta.json() == incidencia_falsa
     crear_mock.assert_called_once_with(
         "Error en el sistema",
+        "Otros",
         "El sistema no responde",
         "Alta"
     )
@@ -101,11 +136,13 @@ def test_crear_incidencia():
 def test_listar_incidencias():
     incidencias_falsas = [
         {
+            "categoria": "Otros",
             **INCIDENCIA_PENDIENTE,
             "id": 1,
             "titulo": "Error de conexión",
         },
         {
+            "categoria": "Otros",
             **INCIDENCIA_PENDIENTE,
             "id": 2,
             "titulo": "Problema de impresión",
@@ -138,6 +175,7 @@ def test_incidencia_no_encontrada():
 
 def test_actualizar_incidencia():
     incidencia_actualizada = {
+                                 "categoria": "Otros",
         **INCIDENCIA_PENDIENTE,
         "titulo": "Error corregido",
         "prioridad": "Media",
@@ -150,6 +188,7 @@ def test_actualizar_incidencia():
         respuesta = client.put(
             "/incidencias/1",
             json={
+                     "categoria": "Otros",
                 "titulo": "Error corregido",
                 "descripcion": "El sistema no responde",
                 "prioridad": "Media"
@@ -172,6 +211,7 @@ def test_rechazar_descripcion_vacia_al_actualizar():
         respuesta = client.put(
             "/incidencias/1",
             json={
+                     "categoria": "Otros",
                 "titulo": "Título válido",
                 "descripcion": "   ",
                 "prioridad": "Alta"
@@ -184,6 +224,7 @@ def test_rechazar_descripcion_vacia_al_actualizar():
 
 def test_eliminar_incidencia():
     incidencia_eliminada = {
+                               "categoria": "Otros",
         **INCIDENCIA_PENDIENTE,
         "titulo": "Error de prueba",
     }
@@ -206,6 +247,7 @@ def test_actualizar_incidencia_inexistente():
         respuesta = client.put(
             "/incidencias/9999",
             json={
+                     "categoria": "Otros",
                 "titulo": "Prueba",
                 "descripcion": "El sistema no responde",
                 "prioridad": "Alta"
@@ -234,6 +276,7 @@ def test_eliminar_incidencia_inexistente():
 def test_filtrar_incidencias_por_prioridad():
     incidencias_falsas = [
         {
+            "categoria": "Otros",
             **INCIDENCIA_PENDIENTE,
             "titulo": "Error crítico",
         }
@@ -402,6 +445,7 @@ def test_rechazar_titulo_muy_largo():
     respuesta = client.post(
         "/incidencias",
         json={
+                 "categoria": "Otros",
             "titulo": "A" * 201,
             "descripcion": "Descripción de prueba",
             "prioridad": "Alta",
