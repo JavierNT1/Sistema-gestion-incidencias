@@ -9,6 +9,8 @@ import {
   SlidersHorizontal,
   X,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -23,10 +25,28 @@ const [titulo, setTitulo] = useState('')
 const [categoria, setCategoria] = useState('')
 const [descripcion, setDescripcion] = useState('')
 const [prioridad, setPrioridad] = useState('Media')
-const [filtroPrioridad, setFiltroPrioridad] = useState('')
-const [filtroEstado, setFiltroEstado] = useState('')
-const [filtroCategoria, setFiltroCategoria] = useState('')
-const [busquedaId, setBusquedaId] = useState('')
+const [filtroPrioridad, actualizarFiltroPrioridad] = useState('')
+const [filtroEstado, actualizarFiltroEstado] = useState('')
+const [filtroCategoria, actualizarFiltroCategoria] = useState('')
+const [busquedaId, actualizarBusquedaId] = useState('')
+const [paginaActual, setPaginaActual] = useState(1)
+const incidenciasPorPagina = 20
+function setFiltroPrioridad(valor) {
+  actualizarFiltroPrioridad(valor)
+  setPaginaActual(1)
+}
+function setFiltroEstado(valor) {
+  actualizarFiltroEstado(valor)
+  setPaginaActual(1)
+}
+function setFiltroCategoria(valor) {
+  actualizarFiltroCategoria(valor)
+  setPaginaActual(1)
+}
+function setBusquedaId(valor) {
+  actualizarBusquedaId(valor)
+  setPaginaActual(1)
+}
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
@@ -181,6 +201,20 @@ const incidenciasVisibles = incidencias.filter((incidencia) => {
 
   return coincideCategoria && coincideId
 })
+
+const totalPaginas = Math.max(
+  1,
+  Math.ceil(incidenciasVisibles.length / incidenciasPorPagina)
+)
+
+const paginaMostrada = Math.min(paginaActual, totalPaginas)
+
+const inicioPagina = (paginaMostrada - 1) * incidenciasPorPagina
+
+const incidenciasPaginadas = incidenciasVisibles.slice(
+  inicioPagina,
+  inicioPagina + incidenciasPorPagina
+)
 
 const exportacionDeshabilitada =
   busquedaId !== '' ||
@@ -843,85 +877,116 @@ return (
     ) : incidenciasVisibles.length === 0 ? (
       <p className="message">No hay incidencias registradas.</p>
     ) : (
-      <div className="incidents-table-scroll">
-      <table className="incidents-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Título</th>
-            <th>Categoría</th>
-            <th>Descripción</th>
-            <th>Prioridad</th>
-            <th>Estado</th>
-            <th>Fecha de creación</th>
-          </tr>
-        </thead>
+      <><div className="incidents-table-scroll">
+                <table className="incidents-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Título</th>
+                      <th>Categoría</th>
+                      <th>Descripción</th>
+                      <th>Prioridad</th>
+                      <th>Estado</th>
+                      <th>Fecha de creación</th>
+                    </tr>
+                  </thead>
 
-        <tbody>
-          {incidenciasVisibles.map((incidencia) => (
-            <tr 
-            key={incidencia.id}
-            onClick={() => abrirIncidencia(incidencia)}
-            className="incident-row"
-            tabIndex={0}
-            onKeyDown={(evento) => {
-              if (evento.key === 'Enter' || evento.key === ' ') {
-                evento.preventDefault()
-                abrirIncidencia(incidencia)
-              }
-            }}
-            aria-label={`Abrir detalle de la incidencia ${incidencia.titulo}`}
-            >
-              
-              <td>{incidencia.id}</td>
-              <td>{incidencia.titulo}</td>
-              <td>{incidencia.categoria}</td>
-              <td className="description-cell">
-                {incidencia.descripcion.length > 70
-                  ? `${incidencia.descripcion.slice(0, 70)}...`
-                  : incidencia.descripcion}
-              </td>              
-              <td>
-                <span
-                  className={`priority priority-${{
-                  Alta: 'high',
-                  Media: 'medium',
-                  Baja: 'low',
-                }[incidencia.prioridad]}`}
-                >
-                  {incidencia.prioridad}
-                </span>
-              </td>
-              <td>
-                <span
-                  className={`status ${
-                    incidencia.estado === 'Pendiente'
-                      ? 'status-pending'
-                      : incidencia.estado === 'En progreso'
-                        ? 'status-progress'
-                        : 'status-resolved'
-                  }`}
-                >
-                  {incidencia.estado}
-                </span>
-              </td>
-              <td>
-                {new Date(incidencia.fecha_creacion).toLocaleDateString(
-                  'es-CL',
-                  {     timeZone: 'America/Santiago',
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false}
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
+                  <tbody>
+                    {incidenciasPaginadas.map((incidencia) => (
+                      <tr
+                        key={incidencia.id}
+                        onClick={() => abrirIncidencia(incidencia)}
+                        className="incident-row"
+                        tabIndex={0}
+                        onKeyDown={(evento) => {
+                          if (evento.key === 'Enter' || evento.key === ' ') {
+                            evento.preventDefault()
+                            abrirIncidencia(incidencia)
+                          }
+                        } }
+                        aria-label={`Abrir detalle de la incidencia ${incidencia.titulo}`}
+                      >
+
+                        <td>{incidencia.id}</td>
+                        <td>{incidencia.titulo}</td>
+                        <td>{incidencia.categoria}</td>
+                        <td className="description-cell">
+                          {incidencia.descripcion.length > 70
+                            ? `${incidencia.descripcion.slice(0, 70)}...`
+                            : incidencia.descripcion}
+                        </td>
+                        <td>
+                          <span
+                            className={`priority priority-${{
+                              Alta: 'high',
+                              Media: 'medium',
+                              Baja: 'low',
+                            }[incidencia.prioridad]}`}
+                          >
+                            {incidencia.prioridad}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`status ${incidencia.estado === 'Pendiente'
+                                ? 'status-pending'
+                                : incidencia.estado === 'En progreso'
+                                  ? 'status-progress'
+                                  : 'status-resolved'}`}
+                          >
+                            {incidencia.estado}
+                          </span>
+                        </td>
+                        <td>
+                          {new Date(incidencia.fecha_creacion).toLocaleDateString(
+                            'es-CL',
+                            {
+                              timeZone: 'America/Santiago',
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            }
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div><div className="pagination">
+                  <span className="pagination-info">
+                    Mostrando <strong>{inicioPagina + 1}–{Math.min(inicioPagina + incidenciasPorPagina, incidenciasVisibles.length)}</strong>
+                    {' '}de <strong>{incidenciasVisibles.length}</strong> incidencias
+                  </span>
+
+                  <div className="pagination-controls">
+                    <button
+                      type="button"
+                      disabled={paginaMostrada === 1}
+                      onClick={() => setPaginaActual(paginaMostrada - 1)}
+                      aria-label="Ir a la página anterior"
+                    >
+                      <ChevronLeft size={16} aria-hidden="true" />
+                      Anterior
+                    </button>
+
+                    <span className="pagination-current" aria-live="polite" aria-atomic="true">
+                      Página <strong>{paginaMostrada}</strong> de {totalPaginas}
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={paginaMostrada === totalPaginas}
+                      onClick={() => setPaginaActual(paginaMostrada + 1)}
+                      aria-label="Ir a la página siguiente"
+                    >
+                      Siguiente
+                      <ChevronRight size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div></>
     )}
   </section>
   {incidenciaSeleccionada && (
