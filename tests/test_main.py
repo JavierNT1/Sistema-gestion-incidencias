@@ -453,3 +453,222 @@ def test_rechazar_titulo_muy_largo():
     )
 
     assert respuesta.status_code == 422
+
+def test_exportar_incidencias_csv():
+    import csv
+    import io
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=[INCIDENCIA_PENDIENTE]
+    ):
+        respuesta = client.get("/incidencias/exportar/csv")
+
+    assert respuesta.status_code == 200
+    assert "text/csv" in respuesta.headers["content-type"]
+    assert "incidencias.csv" in respuesta.headers["content-disposition"]
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 1
+    assert filas[0]["id"] == "1"
+    assert filas[0]["titulo"] == "Error de conexión"
+    assert filas[0]["categoria"] == "Otros"
+    assert filas[0]["prioridad"] == "Alta"
+    assert filas[0]["estado"] == "Pendiente"
+
+def test_exportar_incidencias_excel():
+    import io
+    from openpyxl import load_workbook
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=[INCIDENCIA_PENDIENTE]
+    ):
+        respuesta = client.get("/incidencias/exportar/excel")
+
+    assert respuesta.status_code == 200
+    assert "incidencias.xlsx" in respuesta.headers["content-disposition"]
+
+    libro = load_workbook(io.BytesIO(respuesta.content))
+    hoja = libro["Incidencias"]
+
+    assert hoja.max_row == 2
+    assert hoja["A1"].value == "ID"
+    assert hoja["B1"].value == "Título"
+    assert hoja["C1"].value == "Categoría"
+
+    assert hoja["A2"].value == 1
+    assert hoja["B2"].value == "Error de conexión"
+    assert hoja["C2"].value == "Otros"
+    assert hoja["E2"].value == "Alta"
+    assert hoja["F2"].value == "Pendiente"
+
+    assert hoja.freeze_panes == "A2"
+    assert hoja.auto_filter.ref == hoja.dimensions
+
+def test_exportar_csv_filtrado_por_estado():
+    import csv
+    import io
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1},
+        {**INCIDENCIA_EN_PROGRESO, "id": 2},
+        {**INCIDENCIA_RESUELTA, "id": 3},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/csv?estado=Resuelta"
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 1
+    assert filas[0]["id"] == "3"
+    assert filas[0]["estado"] == "Resuelta"
+
+def test_exportar_excel_filtrado_por_estado():
+    import io
+    from openpyxl import load_workbook
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1},
+        {**INCIDENCIA_EN_PROGRESO, "id": 2},
+        {**INCIDENCIA_RESUELTA, "id": 3},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/excel?estado=Resuelta"
+        )
+
+    assert respuesta.status_code == 200
+
+    libro = load_workbook(io.BytesIO(respuesta.content))
+    hoja = libro["Incidencias"]
+
+    assert hoja.max_row == 2
+    assert hoja["A2"].value == 3
+    assert hoja["F2"].value == "Resuelta"
+
+def test_exportar_csv_filtrado_por_prioridad():
+    import csv
+    import io
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1, "prioridad": "Alta"},
+        {**INCIDENCIA_PENDIENTE, "id": 2, "prioridad": "Media"},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=[incidencias[0]]
+    ) as obtener_mock:
+        respuesta = client.get(
+            "/incidencias/exportar/csv?prioridad=Alta"
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 1
+    assert filas[0]["id"] == "1"
+    assert filas[0]["prioridad"] == "Alta"
+
+    obtener_mock.assert_called_once_with("Alta")
+
+def test_exportar_excel_filtrado_por_prioridad():
+    import io
+    from openpyxl import load_workbook
+
+    incidencia_alta = {
+        **INCIDENCIA_PENDIENTE,
+        "id": 1,
+        "prioridad": "Alta",
+    }
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=[incidencia_alta]
+    ) as obtener_mock:
+        respuesta = client.get(
+            "/incidencias/exportar/excel?prioridad=Alta"
+        )
+
+    assert respuesta.status_code == 200
+
+    libro = load_workbook(io.BytesIO(respuesta.content))
+    hoja = libro["Incidencias"]
+
+    assert hoja.max_row == 2
+    assert hoja["A2"].value == 1
+    assert hoja["E2"].value == "Alta"
+
+    obtener_mock.assert_called_once_with("Alta")
+
+def test_exportar_csv_filtrado_por_categoria():
+    import csv
+    import io
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1, "categoria": "Otros"},
+        {**INCIDENCIA_PENDIENTE, "id": 2, "categoria": "Seguridad"},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/csv",
+            params={"categoria": "Seguridad"}
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 1
+    assert filas[0]["id"] == "2"
+    assert filas[0]["categoria"] == "Seguridad"
+
+def test_exportar_excel_filtrado_por_categoria():
+    import io
+    from openpyxl import load_workbook
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1, "categoria": "Otros"},
+        {**INCIDENCIA_PENDIENTE, "id": 2, "categoria": "Seguridad"},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/excel",
+            params={"categoria": "Seguridad"}
+        )
+
+    assert respuesta.status_code == 200
+
+    libro = load_workbook(io.BytesIO(respuesta.content))
+    hoja = libro["Incidencias"]
+
+    assert hoja.max_row == 2
+    assert hoja["A2"].value == 2
+    assert hoja["C2"].value == "Seguridad"

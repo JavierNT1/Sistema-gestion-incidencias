@@ -1,3 +1,8 @@
+import csv
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from fastapi.responses import StreamingResponse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -56,6 +61,151 @@ def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None
             if incidencia["categoria"] == categoria.value
         ]
     return incidencias
+
+
+@app.get("/incidencias/exportar/csv")
+def exportar_incidencias_csv(
+    prioridad: Prioridad | None = None,
+    estado: Estado | None = None,
+    categoria: Categoria | None = None,
+):
+    incidencias = listar_incidencias(
+        prioridad=prioridad,
+        estado=estado,
+        categoria=categoria,
+    )
+
+    archivo = io.StringIO(newline="")
+
+    columnas = [
+        "id",
+        "titulo",
+        "categoria",
+        "descripcion",
+        "prioridad",
+        "estado",
+        "fecha_creacion",
+        "fecha_resolucion",
+    ]
+
+    escritor = csv.DictWriter(
+        archivo,
+        fieldnames=columnas,
+        extrasaction="ignore",
+    )
+
+    escritor.writeheader()
+
+    for incidencia in incidencias:
+        fila = {
+            columna: incidencia.get(columna)
+            for columna in columnas
+        }
+
+        for columna in ("titulo", "categoria", "descripcion", "prioridad", "estado"):
+            valor = fila[columna]
+            if isinstance(valor, str) and valor.lstrip().startswith(
+                ("=", "+", "-", "@", "\t", "\r", "\n")
+            ):
+                fila[columna] = "'" + valor
+
+        escritor.writerow({
+            clave: "" if valor is None else valor
+            for clave, valor in fila.items()
+        })
+
+    contenido = archivo.getvalue()
+    archivo.close()
+
+    return StreamingResponse(
+        iter(["\ufeff", contenido]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="incidencias.csv"'
+        },
+    )
+
+
+@app.get("/incidencias/exportar/excel")
+def exportar_incidencias_excel(
+    prioridad: Prioridad | None = None,
+    estado: Estado | None = None,
+    categoria: Categoria | None = None,
+):
+    incidencias = listar_incidencias(
+        prioridad=prioridad,
+        estado=estado,
+        categoria=categoria,
+    )
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Incidencias"
+
+    columnas = [
+        ("ID", "id"),
+        ("Título", "titulo"),
+        ("Categoría", "categoria"),
+        ("Descripción", "descripcion"),
+        ("Prioridad", "prioridad"),
+        ("Estado", "estado"),
+        ("Fecha de creación", "fecha_creacion"),
+        ("Fecha de resolución", "fecha_resolucion"),
+    ]
+
+    hoja.append([titulo for titulo, _ in columnas])
+
+    for celda in hoja[1]:
+        celda.font = Font(color="FFFFFF", bold=True)
+        celda.fill = PatternFill(
+            fill_type="solid",
+            fgColor="1F4E78",
+        )
+        celda.alignment = Alignment(horizontal="center")
+
+    for incidencia in incidencias:
+        fila = []
+
+        for _, campo in columnas:
+            valor = incidencia.get(campo)
+
+            # Evitar que el contenido de usuarios se interprete
+            # como una fórmula de Excel.
+            if isinstance(valor, str) and valor.startswith("="):
+                valor = "'" + valor
+
+            # Excel no admite fechas con zona horaria.
+            if hasattr(valor, "tzinfo") and valor.tzinfo is not None:
+                valor = valor.replace(tzinfo=None)
+
+            fila.append(valor)
+
+        hoja.append(fila)
+
+    anchos = [10, 35, 30, 55, 16, 18, 24, 24]
+
+    for indice, ancho in enumerate(anchos, start=1):
+        hoja.column_dimensions[
+            hoja.cell(row=1, column=indice).column_letter
+        ].width = ancho
+
+    hoja.freeze_panes = "A2"
+    hoja.auto_filter.ref = hoja.dimensions
+
+    archivo = io.BytesIO()
+    libro.save(archivo)
+    archivo.seek(0)
+
+    return StreamingResponse(
+        archivo,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        headers={
+            "Content-Disposition": 'attachment; filename="incidencias.xlsx"'
+        },
+    )
 
 
 @app.get("/incidencias/{id}", response_model=IncidenciaRespuesta)

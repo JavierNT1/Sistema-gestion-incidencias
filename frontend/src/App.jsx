@@ -8,6 +8,7 @@ import {
   Plus,
   SlidersHorizontal,
   X,
+  Download,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -31,6 +32,28 @@ const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
 const [descripcionEditada, setDescripcionEditada] = useState('')
 const [prioridadEditada, setPrioridadEditada] = useState('')
+
+function descargarIncidencias(formato) {
+  if (exportacionDeshabilitada) return
+
+  const url = new URL(
+    `http://127.0.0.1:8000/incidencias/exportar/${formato}`
+  )
+
+  if (filtroPrioridad) {
+    url.searchParams.set('prioridad', filtroPrioridad)
+  }
+
+  if (filtroEstado) {
+    url.searchParams.set('estado', filtroEstado)
+  }
+
+  if (filtroCategoria) {
+    url.searchParams.set('categoria', filtroCategoria)
+  }
+
+  window.location.href = url.toString()
+}
 
 async function guardarIncidencia(evento) {
 evento.preventDefault()
@@ -158,6 +181,12 @@ const incidenciasVisibles = incidencias.filter((incidencia) => {
 
   return coincideCategoria && coincideId
 })
+
+const exportacionDeshabilitada =
+  busquedaId !== '' ||
+  cargando ||
+  Boolean(error) ||
+  incidenciasVisibles.length === 0
 
 const prioridadAlta = todasLasIncidencias.filter(
   (incidencia) => incidencia.prioridad === 'Alta'
@@ -686,8 +715,50 @@ return (
 
   <section className="incidents-panel">
     <div className="incidents-toolbar">
+    <div className="incidents-toolbar-title">
       <h2>Incidencias registradas</h2>
-          <div className="filtros">
+
+      <div className="export-actions">
+        <button
+          type="button"
+          className="btn-export"
+          onClick={() => descargarIncidencias('excel')}
+          disabled={exportacionDeshabilitada}
+          aria-describedby={
+            exportacionDeshabilitada && !cargando && !error
+              ? 'exportacion-no-disponible'
+              : undefined
+          }
+        >
+          <Download size={16} aria-hidden="true" />
+          Excel
+        </button>
+
+        <button
+          type="button"
+          className="btn-export"
+          onClick={() => descargarIncidencias('csv')}
+          disabled={exportacionDeshabilitada}
+          aria-describedby={
+            exportacionDeshabilitada && !cargando && !error
+              ? 'exportacion-no-disponible'
+              : undefined
+          }
+        >
+          <Download size={16} aria-hidden="true" />
+          CSV
+        </button>
+          {exportacionDeshabilitada && !cargando && !error && (
+            <p id="exportacion-no-disponible" className="export-hint" role="status">
+              {busquedaId !== ''
+                ? 'Limpia la búsqueda por ID para exportar Excel o CSV.'
+                : 'No hay incidencias disponibles para exportar con los filtros actuales.'}
+            </p>
+          )}
+      </div>
+    </div>
+
+    <div className="filtros">
         <div className="search-id-wrapper">
               <input
           type="number"
