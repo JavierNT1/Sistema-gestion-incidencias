@@ -29,6 +29,8 @@ const [filtroPrioridad, actualizarFiltroPrioridad] = useState('')
 const [filtroEstado, actualizarFiltroEstado] = useState('')
 const [filtroCategoria, actualizarFiltroCategoria] = useState('')
 const [busquedaId, actualizarBusquedaId] = useState('')
+const [busquedaTitulo, actualizarBusquedaTitulo] = useState('')
+const [tipoBusqueda, setTipoBusqueda] = useState('titulo')
 const [paginaActual, setPaginaActual] = useState(1)
 const incidenciasPorPagina = 20
 function setFiltroPrioridad(valor) {
@@ -45,6 +47,16 @@ function setFiltroCategoria(valor) {
 }
 function setBusquedaId(valor) {
   actualizarBusquedaId(valor)
+  setPaginaActual(1)
+}
+function setBusquedaTitulo(valor) {
+  actualizarBusquedaTitulo(valor)
+  setPaginaActual(1)
+}
+function cambiarTipoBusqueda(tipo) {
+  setTipoBusqueda(tipo)
+  actualizarBusquedaTitulo('')
+  actualizarBusquedaId('')
   setPaginaActual(1)
 }
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
@@ -70,6 +82,10 @@ function descargarIncidencias(formato) {
 
   if (filtroCategoria) {
     url.searchParams.set('categoria', filtroCategoria)
+  }
+
+  if (tipoBusqueda === 'titulo' && busquedaTitulo.trim()) {
+  url.searchParams.set('titulo', busquedaTitulo.trim())
   }
 
   window.location.href = url.toString()
@@ -199,7 +215,11 @@ const incidenciasVisibles = incidencias.filter((incidencia) => {
   const coincideId =
     busquedaId === '' || incidencia.id === Number(busquedaId)
 
-  return coincideCategoria && coincideId
+  const coincideTitulo = incidencia.titulo
+    .toLocaleLowerCase('es')
+    .includes(busquedaTitulo.trim().toLocaleLowerCase('es'))
+
+  return coincideCategoria && coincideId && coincideTitulo
 })
 
 const totalPaginas = Math.max(
@@ -793,26 +813,42 @@ return (
     </div>
 
     <div className="filtros">
-        <div className="search-id-wrapper">
-              <input
-          type="number"
-          min="1"
-          placeholder="Buscar ID..."
-          aria-label="Buscar incidencia por ID"
-          value={busquedaId}
-          onChange={(evento) => setBusquedaId(evento.target.value)}
-          className="search-id"
-        />
-          {busquedaId !== '' && (
-            <button type="button" className="search-id-clear"
-              aria-label="Limpiar búsqueda por ID"
-              onClick={(evento) => {
-                setBusquedaId('')
-                evento.currentTarget.parentElement.querySelector('input').focus()
-              }}>
-              <X size={14} aria-hidden="true" />
+        <div className="search-unified">
+          <div className="search-mode" role="group" aria-label="Tipo de búsqueda">
+            <button
+              type="button"
+              className={tipoBusqueda === 'titulo' ? 'active' : ''}
+              aria-pressed={tipoBusqueda === 'titulo'}
+              onClick={() => cambiarTipoBusqueda('titulo')}
+            >
+              Título
             </button>
-          )}
+
+            <button
+              type="button"
+              className={tipoBusqueda === 'id' ? 'active' : ''}
+              aria-pressed={tipoBusqueda === 'id'}
+              onClick={() => cambiarTipoBusqueda('id')}
+            >
+              ID
+            </button>
+          </div>
+
+          <input
+            type={tipoBusqueda === 'id' ? 'number' : 'search'}
+            min={tipoBusqueda === 'id' ? '1' : undefined}
+            placeholder={tipoBusqueda === 'id' ? 'Buscar ID...' : 'Buscar por título...'}
+            aria-label={tipoBusqueda === 'id' ? 'Buscar incidencia por ID' : 'Buscar incidencia por título'}
+            value={tipoBusqueda === 'id' ? busquedaId : busquedaTitulo}
+            onChange={(evento) => {
+              if (tipoBusqueda === 'id') {
+                setBusquedaId(evento.target.value)
+              } else {
+                setBusquedaTitulo(evento.target.value)
+              }
+            }}
+            className="search-unified-input"
+          />
         </div>
         <SlidersHorizontal className="filters-icon" size={17} aria-hidden="true" />
         {[
@@ -858,12 +894,13 @@ return (
             </div>
           </details>
         ))}
-        {(filtroPrioridad || filtroEstado || filtroCategoria || busquedaId) && (
+        {(filtroPrioridad || filtroEstado || filtroCategoria || busquedaId || busquedaTitulo) && (
           <button type="button" className="filters-clear" onClick={() => {
             setFiltroPrioridad('')
             setFiltroEstado('')
             setFiltroCategoria('')
             setBusquedaId('')
+            setBusquedaTitulo('')
           }}>Limpiar filtros</button>
         )}
       </div>

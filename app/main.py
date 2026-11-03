@@ -40,10 +40,13 @@ app.add_middleware(
 def inicio():
     return {"mensaje": "Sistema de Gestión de Incidencias"}
 
-
-
 @app.get("/incidencias", response_model=list[IncidenciaRespuesta])
-def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None = None, categoria: Categoria | None = None):
+def listar_incidencias(
+    prioridad: Prioridad | None = None,
+    estado: Estado | None = None,
+    categoria: Categoria | None = None,
+    titulo: str | None = None,
+):
     incidencias = obtener_incidencias(
         prioridad.value if prioridad else None
     )
@@ -54,25 +57,37 @@ def listar_incidencias(prioridad: Prioridad | None = None, estado: Estado | None
             for incidencia in incidencias
             if incidencia["estado"] == estado.value
         ]
+
     if categoria is not None:
         incidencias = [
             incidencia
             for incidencia in incidencias
             if incidencia["categoria"] == categoria.value
         ]
-    return incidencias
 
+    if titulo is not None and titulo.strip():
+        texto_buscado = titulo.strip().casefold()
+
+        incidencias = [
+            incidencia
+            for incidencia in incidencias
+            if texto_buscado in incidencia["titulo"].casefold()
+        ]
+
+    return incidencias
 
 @app.get("/incidencias/exportar/csv")
 def exportar_incidencias_csv(
     prioridad: Prioridad | None = None,
     estado: Estado | None = None,
     categoria: Categoria | None = None,
+    titulo: str | None = None,
 ):
     incidencias = listar_incidencias(
         prioridad=prioridad,
         estado=estado,
         categoria=categoria,
+        titulo=titulo,
     )
 
     archivo = io.StringIO(newline="")
@@ -131,11 +146,13 @@ def exportar_incidencias_excel(
     prioridad: Prioridad | None = None,
     estado: Estado | None = None,
     categoria: Categoria | None = None,
+    titulo: str | None = None,
 ):
     incidencias = listar_incidencias(
         prioridad=prioridad,
         estado=estado,
         categoria=categoria,
+        titulo=titulo,
     )
 
     libro = Workbook()
