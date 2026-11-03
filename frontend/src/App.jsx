@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  BarChart3,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -23,7 +24,7 @@ const [todasLasIncidencias, setTodasLasIncidencias] = useState([])
 const [cargando, setCargando] = useState(true)
 const [error, setError] = useState('')
 const [erroresEdicion, setErroresEdicion] = useState({})
-const [mostrarFormulario, setMostrarFormulario] = useState(false)
+const [vistaActual, setVistaActual] = useState('inicio')
 const [titulo, setTitulo] = useState('')
 const [categoria, setCategoria] = useState('')
 const [descripcion, setDescripcion] = useState('')
@@ -38,6 +39,11 @@ const [paginaActual, setPaginaActual] = useState(1)
 const incidenciasPorPagina = 20
 const [ordenColumna, setOrdenColumna] = useState(null)
 const [ordenDireccion, setOrdenDireccion] = useState('asc')
+
+function cambiarVista(vista) {
+  setVistaActual(vista)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 function cambiarOrden(columna) {
   if (ordenColumna === columna) {
@@ -173,7 +179,7 @@ setTitulo('')
 setCategoria('')
 setDescripcion('')
 setPrioridad('Media')
-setMostrarFormulario(false)
+cambiarVista('inicio')
 
 } catch (error) {
 setError(error.message)
@@ -568,17 +574,38 @@ return (
 <h1>Sistema de Gestión de Incidencias</h1>
 <p>Administra y consulta las incidencias registradas.</p>
 </div>
-    <button
-      className="btn-primary"
-      type="button"
-      onClick={() => setMostrarFormulario(true)}
-    >
-      <Plus size={18} aria-hidden="true" />
-      <span>Nueva incidencia</span>
-    </button>
+    <div className="header-actions">
+      {vistaActual !== 'inicio' && (
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => cambiarVista('inicio')}
+        >
+          Volver al inicio
+        </button>
+      )}      
+      <button
+        className="btn-secondary"
+        type="button"
+        onClick={() => cambiarVista('estadisticas')}
+      >
+        <BarChart3 size={18} aria-hidden="true" />
+        <span>Estadísticas</span>
+      </button>
+
+      <button
+        className="btn-primary"
+        type="button"
+        onClick={() => cambiarVista('nueva')}
+      >
+        <Plus size={18} aria-hidden="true" />
+        <span>Nueva incidencia</span>
+      </button>
+    </div>
   </header>
 
-
+  {vistaActual === 'inicio' && (
+    <>
   <section className="summary">
     <article className="summary-card">
       <div className="summary-label">
@@ -649,7 +676,9 @@ return (
       <p>Incidencias solucionadas</p>
     </article>
   </section>
-
+  </>
+)}
+  {vistaActual === 'estadisticas' && (
   <section className="charts-grid">
     {[
       {
@@ -751,9 +780,10 @@ return (
         </div>
       </article>
     ))}
-  </section>
+      </section>
+    )}
 
-  {mostrarFormulario && (
+    {vistaActual === 'nueva' && (
     <section className="incidents-panel form-panel">
       <h2>Nueva incidencia</h2>
       {error && <p className="message error">{error}</p>}
@@ -814,7 +844,7 @@ return (
           <button
             className="btn-secondary"
             type="button"
-            onClick={() => setMostrarFormulario(false)}
+            onClick={() => cambiarVista('inicio')}
           >
             Cancelar
           </button>
@@ -826,7 +856,7 @@ return (
       </form>
     </section>
   )}
-
+{vistaActual === 'inicio' && (
   <section className="incidents-panel">
     <div className="incidents-toolbar">
     <div className="incidents-toolbar-title">
@@ -1121,6 +1151,7 @@ return (
                 </div></>
     )}
   </section>
+  )}
   {incidenciaSeleccionada && (
     <div className="modal-overlay" onClick={cerrarDetalle}>
       <div
