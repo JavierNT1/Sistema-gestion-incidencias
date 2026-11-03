@@ -672,3 +672,174 @@ def test_exportar_excel_filtrado_por_categoria():
     assert hoja.max_row == 2
     assert hoja["A2"].value == 2
     assert hoja["C2"].value == "Seguridad"
+
+def test_exportar_csv_filtrado_por_titulo():
+    import csv
+    import io
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1, "titulo": "Impresora sin conexión"},
+        {**INCIDENCIA_PENDIENTE, "id": 2, "titulo": "Cámara sin señal"},
+        {**INCIDENCIA_PENDIENTE, "id": 3, "titulo": "Impresora dañada"},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/csv",
+            params={"titulo": "IMPRESORA"}
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 2
+    assert {fila["id"] for fila in filas} == {"1", "3"}
+    assert all("impresora" in fila["titulo"].lower() for fila in filas)
+
+def test_exportar_excel_filtrado_por_titulo():
+    import io
+    from openpyxl import load_workbook
+
+    incidencias = [
+        {**INCIDENCIA_PENDIENTE, "id": 1, "titulo": "Impresora sin conexión"},
+        {**INCIDENCIA_PENDIENTE, "id": 2, "titulo": "Cámara sin señal"},
+        {**INCIDENCIA_PENDIENTE, "id": 3, "titulo": "Impresora dañada"},
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/excel",
+            params={"titulo": "IMPRESORA"}
+        )
+
+    assert respuesta.status_code == 200
+
+    libro = load_workbook(io.BytesIO(respuesta.content))
+    hoja = libro.active
+
+    filas = list(hoja.iter_rows(min_row=2, values_only=True))
+
+    assert len(filas) == 2
+    assert {fila[0] for fila in filas} == {1, 3}
+    assert all("impresora" in fila[1].lower() for fila in filas)
+
+    libro.close()
+
+def test_exportar_csv_con_filtros_combinados():
+    import csv
+    import io
+
+    incidencias = [
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 1,
+            "titulo": "Impresora sin conexión",
+            "prioridad": "Alta",
+            "estado": "Pendiente",
+        },
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 2,
+            "titulo": "Impresora con atasco",
+            "prioridad": "Baja",
+            "estado": "Pendiente",
+        },
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 3,
+            "titulo": "Impresora sin tinta",
+            "prioridad": "Alta",
+            "estado": "En progreso",
+        },
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 4,
+            "titulo": "Cámara sin conexión",
+            "prioridad": "Alta",
+            "estado": "Pendiente",
+        },
+    ]
+
+    def obtener_incidencias_simuladas(prioridad=None):
+        if prioridad is None:
+            return incidencias
+
+        return [
+            incidencia
+            for incidencia in incidencias
+            if incidencia["prioridad"] == prioridad
+        ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        side_effect=obtener_incidencias_simuladas
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/csv",
+            params={
+                "titulo": "impresora",
+                "prioridad": "Alta",
+                "estado": "Pendiente",
+            },
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    filas = list(csv.DictReader(io.StringIO(contenido)))
+
+    assert len(filas) == 1
+    assert filas[0]["id"] == "1"
+    assert filas[0]["titulo"] == "Impresora sin conexión"
+
+def test_exportar_csv_sin_coincidencias():
+    import csv
+    import io
+
+    incidencias = [
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 1,
+            "titulo": "Impresora sin conexión",
+        },
+        {
+            **INCIDENCIA_PENDIENTE,
+            "id": 2,
+            "titulo": "Cámara sin señal",
+        },
+    ]
+
+    with patch(
+        "app.main.obtener_incidencias",
+        return_value=incidencias
+    ):
+        respuesta = client.get(
+            "/incidencias/exportar/csv",
+            params={"titulo": "ascensor espacial"},
+        )
+
+    assert respuesta.status_code == 200
+
+    contenido = respuesta.content.decode("utf-8-sig")
+    lector = csv.DictReader(io.StringIO(contenido))
+
+    assert lector.fieldnames == [
+        "id",
+        "titulo",
+        "categoria",
+        "descripcion",
+        "prioridad",
+        "estado",
+        "fecha_creacion",
+        "fecha_resolucion",
+    ]
+
+    assert list(lector) == []
