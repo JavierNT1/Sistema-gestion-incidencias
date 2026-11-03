@@ -11,6 +11,9 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -33,6 +36,22 @@ const [busquedaTitulo, actualizarBusquedaTitulo] = useState('')
 const [tipoBusqueda, setTipoBusqueda] = useState('titulo')
 const [paginaActual, setPaginaActual] = useState(1)
 const incidenciasPorPagina = 20
+const [ordenColumna, setOrdenColumna] = useState(null)
+const [ordenDireccion, setOrdenDireccion] = useState('asc')
+
+function cambiarOrden(columna) {
+  if (ordenColumna === columna) {
+    setOrdenDireccion((anterior) =>
+      anterior === 'asc' ? 'desc' : 'asc'
+    )
+  } else {
+    setOrdenColumna(columna)
+    setOrdenDireccion(columna === 'fecha_creacion' ? 'desc' : 'asc')
+  }
+
+  setPaginaActual(1)
+}
+
 function setFiltroPrioridad(valor) {
   actualizarFiltroPrioridad(valor)
   setPaginaActual(1)
@@ -59,6 +78,7 @@ function cambiarTipoBusqueda(tipo) {
   actualizarBusquedaId('')
   setPaginaActual(1)
 }
+
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
 const [tituloEditado, setTituloEditado] = useState('')
@@ -222,6 +242,46 @@ const incidenciasVisibles = incidencias.filter((incidencia) => {
   return coincideCategoria && coincideId && coincideTitulo
 })
 
+const incidenciasOrdenadas = [...incidenciasVisibles].sort((a, b) => {
+  if (ordenColumna === null) return 0
+
+  let comparacion = 0
+
+  if (ordenColumna === 'id') {
+    comparacion = a.id - b.id
+  }
+
+  if (ordenColumna === 'prioridad') {
+    const ordenPrioridad = {
+      Alta: 1,
+      Media: 2,
+      Baja: 3,
+    }
+
+    comparacion =
+      ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]
+  }
+
+  if (ordenColumna === 'estado') {
+    const ordenEstado = {
+      Pendiente: 1,
+      'En progreso': 2,
+      Resuelta: 3,
+    }
+
+    comparacion =
+      ordenEstado[a.estado] - ordenEstado[b.estado]
+  }
+
+  if (ordenColumna === 'fecha_creacion') {
+    comparacion =
+      new Date(a.fecha_creacion).getTime() -
+      new Date(b.fecha_creacion).getTime()
+  }
+
+  return ordenDireccion === 'asc' ? comparacion : -comparacion
+})
+
 const totalPaginas = Math.max(
   1,
   Math.ceil(incidenciasVisibles.length / incidenciasPorPagina)
@@ -231,7 +291,7 @@ const paginaMostrada = Math.min(paginaActual, totalPaginas)
 
 const inicioPagina = (paginaMostrada - 1) * incidenciasPorPagina
 
-const incidenciasPaginadas = incidenciasVisibles.slice(
+const incidenciasPaginadas = incidenciasOrdenadas.slice(
   inicioPagina,
   inicioPagina + incidenciasPorPagina
 )
@@ -918,13 +978,48 @@ return (
                 <table className="incidents-table">
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Título</th>
-                      <th>Categoría</th>
-                      <th>Descripción</th>
-                      <th>Prioridad</th>
-                      <th>Estado</th>
-                      <th>Fecha de creación</th>
+                      {[
+                        { campo: 'id', nombre: 'ID' },
+                        { campo: null, nombre: 'Título' },
+                        { campo: null, nombre: 'Categoría' },
+                        { campo: null, nombre: 'Descripción' },
+                        { campo: 'prioridad', nombre: 'Prioridad' },
+                        { campo: 'estado', nombre: 'Estado' },
+                        { campo: 'fecha_creacion', nombre: 'Fecha de creación' },
+                      ].map(({ campo, nombre }) => (
+                        <th
+                          key={nombre}
+                          aria-sort={
+                            campo && ordenColumna === campo
+                              ? ordenDireccion === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : undefined
+                          }
+                        >
+                          {campo ? (
+                            <button
+                              type="button"
+                              className="table-sort-button"
+                              onClick={() => cambiarOrden(campo)}
+                            >
+                              {nombre}
+
+                              {ordenColumna === campo ? (
+                                ordenDireccion === 'asc' ? (
+                                  <ArrowUp size={14} aria-hidden="true" />
+                                ) : (
+                                  <ArrowDown size={14} aria-hidden="true" />
+                                )
+                              ) : (
+                                <ArrowUpDown size={14} aria-hidden="true" />
+                              )}
+                            </button>
+                          ) : (
+                            nombre
+                          )}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 

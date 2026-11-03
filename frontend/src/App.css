@@ -1071,3 +1071,37 @@
     min-width: 140px;
   }
 }
+
+/* Ordenación de columnas */
+
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.table-sort-button:hover {
+  color: #2563eb;
+}
+
+.table-sort-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.table-sort-button svg {
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+.table-sort-button:hover svg {
+  opacity: 1;
+}
