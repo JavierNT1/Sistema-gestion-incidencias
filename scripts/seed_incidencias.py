@@ -1,5 +1,11 @@
-"""Datos de demostración; simulación por defecto y carga atómica hasta 100."""
+"""Datos de demostración; simulación por defecto y lotes mensuales atómicos."""
 import argparse
+import calendar
+import hashlib
+import random
+import re
+from datetime import date
+from zoneinfo import ZoneInfo
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,7 +16,6 @@ from conexion import obtener_conexion
 from app.schemas import IncidenciaNueva
 
 DESTINO = 'incidencias_db'
-OBJETIVO = 100
 CASOS = {
     'Informática (TI)': [
         ('Impresora sin conexión', 'Los documentos quedan en cola y el equipo no responde por la red.', 'Media'),
@@ -54,142 +59,198 @@ CASOS = {
 LUGARES = ['recepción', 'oficina central', 'sucursal norte', 'sucursal sur']
 
 
-def catalogo():
+# Configuración del generador: cambiar la versión si cambia el algoritmo o catálogo.
+VERSION = 2
+ZONA = ZoneInfo('America/Santiago')
+PESOS_ESTADO = (0.40, 0.35, 0.25)
+RANGOS_HORAS = ((0.5, 12), (12.01, 24), (24.01, 48), (48.01, 72), (72.01, 168))
+EXTRAS = [
+    ('Informática (TI)', 'Carpeta compartida inaccesible', 'El equipo perdió permisos sobre los documentos del turno.', 'Media'),
+    ('Informática (TI)', 'Actualización de seguridad pendiente', 'Una estación no completa la instalación del parche aprobado.', 'Alta'),
+    ('Informática (TI)', 'Telefonía interna sin audio', 'Las llamadas conectan pero no transmiten voz desde el puesto.', 'Media'),
+    ('Mantenimiento e instalaciones', 'Grifería con fuga', 'El lavamanos pierde agua incluso con la llave cerrada.', 'Media'),
+    ('Mantenimiento e instalaciones', 'Ascensor fuera de servicio', 'El ascensor muestra una alarma y quedó bloqueado para inspección.', 'Alta'),
+    ('Seguridad', 'Alarma de acceso intermitente', 'El sensor informa aperturas sin movimiento visible en el registro.', 'Alta'),
+    ('Seguridad', 'Extintor con inspección vencida', 'La etiqueta de mantenimiento requiere revisión del proveedor.', 'Alta'),
+    ('Administración', 'Contrato pendiente de firma', 'La renovación está aprobada pero falta la firma del responsable.', 'Media'),
+    ('Administración', 'Certificado de proveedor vencido', 'El expediente requiere un documento vigente antes del próximo pago.', 'Media'),
+    ('Operaciones y logística', 'Equipo de traslado averiado', 'El carro de carga tiene una rueda trabada y fue retirado del turno.', 'Media'),
+    ('Operaciones y logística', 'Recepción con bultos faltantes', 'La cantidad recibida no coincide con la guía del transportista.', 'Alta'),
+    ('Operaciones y logística', 'Ruta de entrega sin confirmar', 'El destino solicitó cambiar la ventana de recepción del pedido.', 'Media'),
+    ('Otros', 'Solicitud de apoyo para evento', 'La reunión ampliada requiere coordinar equipamiento adicional.', 'Baja'),
+    ('Otros', 'Aviso interno con enlace incorrecto', 'El comunicado dirige a un formulario que ya no está disponible.', 'Baja'),
+]
+
+
+def validar_mes(texto):
+    if not re.fullmatch(r'\d{4}-\d{2}', texto):
+        raise argparse.ArgumentTypeError('El mes debe tener formato AAAA-MM.')
+    try:
+        date.fromisoformat(texto + '-01')
+    except ValueError as error:
+        raise argparse.ArgumentTypeError('Mes o año inválido.') from error
+    return texto
+
+
+def cantidad_positiva(texto):
+    valor = int(texto)
+    if valor <= 0:
+        raise argparse.ArgumentTypeError('La cantidad debe ser mayor que cero.')
+    return valor
+
+
+def limites_mes(mes, ahora):
+    inicio = datetime.fromisoformat(mes + '-01').replace(tzinfo=ZONA)
+    siguiente = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1)
+    if inicio > ahora:
+        raise ValueError('El mes solicitado pertenece al futuro.')
+    return inicio, min(siguiente - timedelta(microseconds=1), ahora)
+
+
+def generar(mes, cantidad, semilla=0, ahora=None):
+    ahora = ahora or datetime.now(timezone.utc)
+    inicio, fin = limites_mes(mes, ahora)
+    rng = random.Random(f'{VERSION}:{mes}:{cantidad}:{semilla}')
+    casos = [(categoria, *caso) for categoria, lista in CASOS.items() for caso in lista] + EXTRAS
+    # Muestreo estratificado: cubre todo el intervalo, con variación entre días.
+    segundos = (fin.astimezone(timezone.utc) - inicio.astimezone(timezone.utc)).total_seconds()
     registros = []
-    for categoria, casos in CASOS.items():
-        cantidad = 18 if categoria in ('Mantenimiento e instalaciones', 'Operaciones y logística') else len(casos) * 4
-        generados = 0
-        for lugar in LUGARES:
-            for titulo, descripcion, prioridad in casos:
-                if generados >= cantidad:
-                    continue
-                registros.append(IncidenciaNueva(
-                    titulo=f'{titulo} — {lugar}', categoria=categoria,
-                    descripcion=f'{descripcion} El aviso corresponde a {lugar}; el responsable del sector solicita seguimiento.',
-                    prioridad=prioridad,
-                ))
-                generados += 1
-    assert len(registros) == OBJETIVO
-    assert len({r.titulo for r in registros}) == OBJETIVO
+    for indice in range(cantidad):
+        creada = inicio.astimezone(timezone.utc) + timedelta(seconds=segundos * (indice + rng.random()) / cantidad)
+        categoria, titulo, descripcion, prioridad = rng.choice(casos)
+        lugar = rng.choice(LUGARES)
+        datos = IncidenciaNueva(titulo=f'{titulo} — {lugar}', categoria=categoria,
+            descripcion=f'{descripcion} Aviso recibido desde {lugar}.', prioridad=prioridad)
+        estado = rng.choices(['Pendiente', 'En progreso', 'Resuelta'], weights=PESOS_ESTADO)[0]
+        resuelta = None
+        if estado == 'Resuelta':
+            duracion = rng.uniform(*rng.choice(RANGOS_HORAS))
+            candidata = creada + timedelta(hours=duracion)
+            if candidata <= ahora:
+                resuelta = candidata
+            else:
+                estado = 'En progreso'
+        registros.append(dict(datos.model_dump(mode='json'), fecha_creacion=creada,
+            estado=estado, fecha_resolucion=resuelta, clave=f'{indice + 1:08d}'))
     return registros
 
 
-def plan(cursor):
-    cursor.execute('SELECT titulo FROM public.incidencias')
-    existentes = cursor.fetchall()
-    faltan = max(0, OBJETIVO - len(existentes))
-    titulos = {fila[0] for fila in existentes}
-    candidatos = [r for r in catalogo() if r.titulo not in titulos]
-    if len(candidatos) < faltan:
-        raise RuntimeError('El catálogo no alcanza sin repetir títulos; no se realizará la carga.')
-    return len(existentes), candidatos[:faltan]
+def lote_id(mes, cantidad, semilla):
+    contenido = f'{VERSION}:{mes}:{cantidad}:{semilla}'
+    return hashlib.sha256(contenido.encode()).hexdigest()
 
 
-def resumen(actual, registros):
-    print(f'Actuales: {actual}; por insertar: {len(registros)}; total previsto: {actual + len(registros)}')
-    print('Categorías nuevas:', dict(Counter(r.categoria.value for r in registros)))
-    print('Prioridades nuevas:', dict(Counter(r.prioridad.value for r in registros)))
+def verificar_destino(cursor, solicitado):
+    if solicitado != DESTINO:
+        raise ValueError('Solo se autoriza incidencias_db como base de desarrollo.')
+    cursor.execute('SELECT current_database()')
+    if cursor.fetchone()[0] != DESTINO:
+        raise ValueError('La conexión no corresponde a incidencias_db; operación detenida.')
 
 
-def ejecutar(args):
+def buscar_lote(cursor, mes, identificador):
+    cursor.execute('SELECT lote_id FROM public.seed_lotes WHERE mes = %s', (mes,))
+    fila = cursor.fetchone()
+    if fila and fila[0] != identificador:
+        raise ValueError('El mes ya tiene otro lote: cantidad, semilla o versión diferentes. No se mezclan lotes.')
+    return bool(fila)
+
+
+def insertar_lote(cursor, mes, cantidad, semilla, referencia, registros):
+    identificador = lote_id(mes, cantidad, semilla)
+    # Serializa por mes; la restricción UNIQUE es la segunda barrera concurrente.
+    cursor.execute('SELECT pg_advisory_xact_lock(%s, %s)', (735201, int(mes.replace('-', ''))))
+    if buscar_lote(cursor, mes, identificador):
+        return False
+    cursor.execute('''INSERT INTO public.seed_lotes (lote_id, mes, cantidad, semilla, version, referencia)
+        VALUES (%s,%s,%s,%s,%s,%s)''', (identificador, mes, cantidad, semilla, VERSION, referencia))
+    for registro in registros:
+        cursor.execute('''INSERT INTO public.incidencias (titulo,categoria,descripcion,prioridad,fecha_creacion)
+            VALUES (%s,%s,%s,%s,%s) RETURNING id''', tuple(registro[k] for k in
+            ('titulo', 'categoria', 'descripcion', 'prioridad', 'fecha_creacion')))
+        nuevo_id = cursor.fetchone()[0]
+        if registro['estado'] != 'Pendiente':
+            cursor.execute("UPDATE public.incidencias SET estado='En progreso' WHERE id=%s AND estado='Pendiente'", (nuevo_id,))
+            if cursor.rowcount != 1:
+                raise ValueError('Falló la transición a En progreso.')
+        if registro['estado'] == 'Resuelta':
+            cursor.execute("UPDATE public.incidencias SET estado='Resuelta',fecha_resolucion=%s WHERE id=%s AND estado='En progreso'",
+                (registro['fecha_resolucion'], nuevo_id))
+            if cursor.rowcount != 1:
+                raise ValueError('Falló la transición a Resuelta.')
+        cursor.execute('INSERT INTO public.seed_registros (lote_id,clave,incidencia_id) VALUES (%s,%s,%s)',
+            (identificador, registro['clave'], nuevo_id))
+    return True
+
+
+def resumen(args, total, registros):
+    print(f'Base de destino: {DESTINO}\nMes solicitado: {args.month}\nCantidad: {args.count}')
+    print(f'Lote: {lote_id(args.month, args.count, args.seed)}\nRegistros existentes: {total}')
+    dias = calendar.monthrange(int(args.month[:4]), int(args.month[5:]))[1]
+    grupos = Counter(min((r['fecha_creacion'].astimezone(ZONA).day - 1) // 7, 4) for r in registros)
+    for indice in range(5):
+        primero = indice * 7 + 1
+        if primero <= dias:
+            print(f'{primero}–{min(primero + 6, dias)}: {grupos[indice]} creadas')
+    for campo in ('estado', 'categoria', 'prioridad'):
+        print(campo.capitalize() + ':', dict(Counter(r[campo] for r in registros)))
+    resueltas = [r for r in registros if r['fecha_resolucion']]
+    mismo = sum(r['fecha_resolucion'].astimezone(ZONA).strftime('%Y-%m') == args.month for r in resueltas)
+    print(f'Resoluciones en el mes: {mismo}; posteriores: {len(resueltas) - mismo}')
+
+
+def ejecutar(args, conectar=obtener_conexion, confirmar=input):
     if args.database != DESTINO:
-        raise RuntimeError(f'Solo se permite el destino de desarrollo {DESTINO}.')
-    with obtener_conexion() as conexion:
+        raise ValueError('Solo se autoriza incidencias_db.')
+    referencia = datetime.now(timezone.utc)
+    registros = generar(args.month, args.count, args.seed, referencia)
+    with conectar() as conexion:
         conexion.read_only = True
         with conexion.cursor() as cursor:
-            cursor.execute('SELECT current_database()')
-            destino = cursor.fetchone()[0]
-            print(f'Base de destino: {destino}')
-            if destino != DESTINO:
-                raise RuntimeError('La conexión no coincide con la base de desarrollo autorizada.')
-            actual, registros = plan(cursor)
-            resumen(actual, registros)
+            verificar_destino(cursor, args.database)
+            cursor.execute('SELECT count(*) FROM public.incidencias')
+            resumen(args, cursor.fetchone()[0], registros)
+            cursor.execute('SELECT to_regclass(%s),to_regclass(%s)', ('public.seed_lotes','public.seed_registros'))
+            tablas = all(cursor.fetchone())
+            if tablas and buscar_lote(cursor, args.month, lote_id(args.month, args.count, args.seed)):
+                print('Lote ya cargado. No se insertan ni modifican registros.')
+                return
         conexion.rollback()
-        if not args.apply or not registros:
-            print('Simulación sin escrituras.' if not args.apply else 'No hacen falta inserciones.')
+        if not args.apply:
+            if not tablas:
+                print('Para cargar hace falta aplicar la migración 001_seed_lotes.sql.')
+            print('Modo simulación: no se realizaron escrituras.')
             return
-        frase = f'CARGAR {DESTINO} HASTA {OBJETIVO}'
-        if input(f'Confirma que es desarrollo escribiendo {frase}: ').strip() != frase:
-            print('Carga cancelada; sin escrituras.')
+        if not tablas:
+            raise ValueError('Falta la migración 001_seed_lotes.sql; el script no modifica el esquema.')
+        frase = f'CARGAR {DESTINO} {args.month} {args.count}'
+        if confirmar(f'Confirma desarrollo escribiendo {frase}: ').strip() != frase:
+            print('Cancelado; sin escrituras.')
             return
         conexion.read_only = False
-        # Un único commit; cualquier excepción revierte el lote completo.
         with conexion.cursor() as cursor:
             cursor.execute("SET LOCAL lock_timeout = '5s'")
-            cursor.execute('LOCK TABLE public.incidencias IN SHARE ROW EXCLUSIVE MODE')
-            actual, registros = plan(cursor)
-            ahora = datetime.now(timezone.utc)
-            ids = []
-            estados = Counter()
-            duraciones_resolucion = [6, 18, 36, 60, 96]
-            for indice, registro in enumerate(registros):
-                estado = (
-                    'Pendiente' if indice % 20 < 8
-                    else ('En progreso' if indice % 20 < 15 else 'Resuelta')
-                )
-
-                creada = ahora - timedelta(days=30, hours=indice)
-                cursor.execute(
-                    '''INSERT INTO public.incidencias
-                    (titulo, categoria, descripcion, prioridad, fecha_creacion)
-                    VALUES (%s, %s, %s, %s, %s) RETURNING id''',
-                    (
-                        registro.titulo,
-                        registro.categoria.value,
-                        registro.descripcion,
-                        registro.prioridad.value,
-                        creada,
-                    )
-                )
-
-                identificador = cursor.fetchone()[0]
-                ids.append(identificador)
-                if estado != 'Pendiente':
-                    cursor.execute(
-                        '''UPDATE public.incidencias SET estado = 'En progreso'
-                        WHERE id = %s AND estado = 'Pendiente' ''',
-                        (identificador,)
-                    )
-
-                    if cursor.rowcount != 1:
-                        raise RuntimeError('No se pudo iniciar la incidencia nueva.')
-
-                if estado == 'Resuelta':
-                    horas_resolucion = duraciones_resolucion[
-                        (indice // 20) % len(duraciones_resolucion)
-                    ]
-                    fecha_resolucion = creada + timedelta(hours=horas_resolucion)
-                    cursor.execute(
-                        '''UPDATE public.incidencias
-                        SET estado = 'Resuelta', fecha_resolucion = %s
-                        WHERE id = %s AND estado = 'En progreso' ''',
-                        (fecha_resolucion, identificador)
-                    )
-
-                    if cursor.rowcount != 1:
-                        raise RuntimeError('No se pudo resolver la incidencia nueva.')
-                estados[estado] += 1
-
-            cursor.execute('SELECT count(*) FROM public.incidencias')
-            total = cursor.fetchone()[0]
-            if registros and total != OBJETIVO:
-                raise RuntimeError('El total final no coincide con el objetivo.')
-            cursor.execute('''SELECT count(*) FROM public.incidencias WHERE id = ANY(%s) AND
-                ((estado = 'Resuelta' AND (fecha_resolucion IS NULL OR fecha_resolucion < fecha_creacion))
-                OR (estado <> 'Resuelta' AND fecha_resolucion IS NOT NULL))''', (ids,))
-            if cursor.fetchone()[0]:
-                raise RuntimeError('Se detectaron fechas inconsistentes.')
+            cargado = insertar_lote(cursor, args.month, args.count, args.seed, referencia, registros)
         conexion.commit()
-        print(f'Carga confirmada: {len(ids)} insertadas; total: {total}. Estados nuevos: {dict(estados)}')
+        print('Lote insertado correctamente.' if cargado else 'Lote ya cargado; sin duplicados.')
+
+
+def argumentos():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--database', required=True)
+    parser.add_argument('--month', required=True, type=validar_mes)
+    parser.add_argument('--count', required=True, type=cantidad_positiva)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--apply', action='store_true')
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--database', required=True, help='Nombre explícito de la base de desarrollo')
-    parser.add_argument('--apply', action='store_true', help='Solicitar confirmación e insertar')
     try:
-        ejecutar(parser.parse_args())
+        ejecutar(argumentos())
+    except (ValueError, EOFError) as error:
+        print(f'Operación detenida: {error}', file=sys.stderr)
+        sys.exit(1)
     except (Exception, KeyboardInterrupt) as error:
-        # No imprimir errores del controlador que puedan incluir información de conexión.
-        print(f'Operación abortada ({type(error).__name__}). No se confirmó la carga.', file=sys.stderr)
+        print(f'Operación abortada ({type(error).__name__}); transacción revertida. Revisar conexión, permisos y migración.', file=sys.stderr)
         sys.exit(1)
