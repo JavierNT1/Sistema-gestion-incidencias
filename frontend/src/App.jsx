@@ -16,7 +16,23 @@ import {
   ArrowDown,
   BarChart3,
 } from 'lucide-react'
-import { PieChart, Pie, Cell, Label, ResponsiveContainer, Tooltip } from 'recharts'
+
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Label,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from 'recharts'
 
 function App() {
 const [incidencias, setIncidencias] = useState([])
@@ -39,6 +55,18 @@ const [paginaActual, setPaginaActual] = useState(1)
 const incidenciasPorPagina = 20
 const [ordenColumna, setOrdenColumna] = useState(null)
 const [ordenDireccion, setOrdenDireccion] = useState('asc')
+const [mesSeleccionado, setMesSeleccionado] = useState(() => {
+  const hoy = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date())
+
+  const anio = hoy.find((parte) => parte.type === 'year').value
+  const mes = hoy.find((parte) => parte.type === 'month').value
+
+  return `${anio}-${mes}`
+})
 
 function cambiarVista(vista) {
   setVistaActual(vista)
@@ -343,6 +371,151 @@ const datosGraficoPrioridades = [
   { nombre: 'Media', cantidad: prioridadMedia, color: '#F59E0B' },
   { nombre: 'Baja', cantidad: prioridadBaja, color: '#22C55E' },
 ]
+
+const categorias = [
+  'Informática (TI)',
+  'Mantenimiento e instalaciones',
+  'Seguridad',
+  'Administración',
+  'Operaciones y logística',
+  'Otros',
+]
+
+const datosGraficoCategorias = categorias.map((categoria) => ({
+  nombre: categoria,
+  cantidad: todasLasIncidencias.filter(
+    (incidencia) => incidencia.categoria === categoria
+  ).length,
+}))
+
+const incidenciasResueltas = todasLasIncidencias.filter(
+  (incidencia) =>
+    incidencia.estado === 'Resuelta' &&
+    incidencia.fecha_creacion &&
+    incidencia.fecha_resolucion
+)
+
+const tiemposResolucion = incidenciasResueltas
+  .map((incidencia) => {
+    const inicio = new Date(incidencia.fecha_creacion).getTime()
+    const fin = new Date(incidencia.fecha_resolucion).getTime()
+
+    return (fin - inicio) / (1000 * 60 * 60)
+  })
+  .filter((horas) => Number.isFinite(horas) && horas >= 0)
+
+const tiempoPromedioResolucion =
+  tiemposResolucion.length > 0
+    ? tiemposResolucion.reduce((total, horas) => total + horas, 0) /
+      tiemposResolucion.length
+    : null
+
+const datosHistogramaResolucion = [
+  {
+    rango: '0–12 h',
+    cantidad: tiemposResolucion.filter(
+      (horas) => horas >= 0 && horas < 12
+    ).length,
+  },
+  {
+    rango: '12–24 h',
+    cantidad: tiemposResolucion.filter(
+      (horas) => horas >= 12 && horas < 24
+    ).length,
+  },
+  {
+    rango: '24–48 h',
+    cantidad: tiemposResolucion.filter(
+      (horas) => horas >= 24 && horas < 48
+    ).length,
+  },
+  {
+    rango: '48–72 h',
+    cantidad: tiemposResolucion.filter(
+      (horas) => horas >= 48 && horas <= 72
+    ).length,
+  },
+  {
+    rango: '>72 h',
+    cantidad: tiemposResolucion.filter(
+      (horas) => horas > 72
+    ).length,
+  },
+]
+
+// Obtener el mes, año y día de una fecha en horario de Chile
+function obtenerFechaChile(fecha) {
+  if (!fecha) return null
+
+  const valor = new Date(fecha)
+  if (Number.isNaN(valor.getTime())) return null
+
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(valor)
+
+  const obtener = (tipo) =>
+    Number(partes.find((parte) => parte.type === tipo)?.value)
+
+  return {
+    anio: obtener('year'),
+    mes: obtener('month') - 1,
+    dia: obtener('day'),
+  }
+}
+
+const [anioSeleccionado, numeroMesSeleccionado] = mesSeleccionado
+  .split('-')
+  .map(Number)
+
+const mesActual = numeroMesSeleccionado - 1
+const anioActual = anioSeleccionado
+
+// Último día del mes: 28, 29, 30 o 31
+const ultimoDiaMes = new Date(anioActual, mesActual + 1, 0).getDate()
+
+// Períodos que mostraremos en el gráfico
+const periodosMes = [
+  { inicio: 1, fin: 7 },
+  { inicio: 8, fin: 14 },
+  { inicio: 15, fin: 21 },
+  { inicio: 22, fin: 28 },
+  { inicio: 29, fin: ultimoDiaMes },
+]
+
+// Preparar los datos del gráfico
+const datosEvolucionMensual = periodosMes
+  .filter((periodo) => periodo.inicio <= ultimoDiaMes)
+  .map((periodo) => {
+    const fin = Math.min(periodo.fin, ultimoDiaMes)
+
+    const perteneceAlPeriodo = (fecha) => {
+      const valor = obtenerFechaChile(fecha)
+
+      return (
+        valor !== null &&
+        valor.anio === anioActual &&
+        valor.mes === mesActual &&
+        valor.dia >= periodo.inicio &&
+        valor.dia <= fin
+      )
+    }
+
+    return {
+      periodo: `${periodo.inicio}–${fin}`,
+      creadas: todasLasIncidencias.filter((incidencia) =>
+        perteneceAlPeriodo(incidencia.fecha_creacion)
+      ).length,
+      resueltas: todasLasIncidencias.filter(
+        (incidencia) =>
+          incidencia.estado === 'Resuelta' &&
+          perteneceAlPeriodo(incidencia.fecha_resolucion)
+      ).length,
+    }
+  })
 
 function abrirIncidencia(incidencia) {
   setErroresEdicion({})
@@ -780,6 +953,172 @@ return (
         </div>
       </article>
     ))}
+      <article className="chart-panel chart-panel-wide">
+        <div className="chart-header">
+          <h2>Incidencias por categoría</h2>
+          <p>Distribución de incidencias entre las seis categorías</p>
+        </div>
+
+        <div className="chart-content">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={datosGraficoCategorias}
+              layout="vertical"
+              margin={{ top: 10, right: 30, left: 35, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+
+              <XAxis type="number" allowDecimals={false} />
+
+              <YAxis
+                type="category"
+                dataKey="nombre"
+                width={185}
+                tick={{ fontSize: 11 }}
+              />
+
+              <Tooltip />
+
+              <Bar
+                dataKey="cantidad"
+                name="Incidencias"
+                fill="#3B82F6"
+                radius={[0, 6, 6, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </article>
+
+      <article className="chart-panel chart-panel-wide">
+        <div className="chart-header">
+          <h2>Tiempo promedio de resolución</h2>
+          <p>Tiempo transcurrido desde la creación hasta la resolución</p>
+        </div>
+
+        <div className="resolution-stat">
+          <Clock size={28} aria-hidden="true" />
+
+          <div>
+            <strong>
+              {tiempoPromedioResolucion !== null
+                ? `${tiempoPromedioResolucion.toFixed(1)} horas`
+                : 'Sin datos'}
+            </strong>
+
+            <p>
+              Calculado a partir de {tiemposResolucion.length} incidencias
+              resueltas con fechas válidas
+            </p>
+          </div>
+        </div>
+      </article>
+      <article className="chart-panel chart-panel-wide">
+        <div className="chart-header">
+          <h2>Distribución de tiempos de resolución</h2>
+          <p>
+            Cantidad de incidencias resueltas según el tiempo transcurrido
+          </p>
+        </div>
+
+        <div className="resolution-histogram">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={datosHistogramaResolucion}
+              margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+              />
+
+              <XAxis
+                dataKey="rango"
+                tick={{ fontSize: 12 }}
+              />
+
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12 }}
+              />
+
+              <Tooltip />
+
+              <Bar
+                dataKey="cantidad"
+                name="Incidencias"
+                fill="#3B82F6"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={90}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </article>
+      <article className="chart-panel chart-panel-wide">
+        <div className="chart-header">
+          <h2>Evolución mensual de incidencias</h2>
+          <p>
+            Incidencias creadas y resueltas durante el mes seleccionado
+          </p>
+
+          <div className="month-selector">
+            <label htmlFor="mes-estadisticas">Seleccionar mes:</label>
+
+            <input
+              id="mes-estadisticas"
+              type="month"
+              value={mesSeleccionado}
+              max={`${new Date().getFullYear()}-12`}
+              onChange={(evento) => setMesSeleccionado(evento.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="resolution-histogram">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart
+              data={datosEvolucionMensual}
+              margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+              />
+
+              <XAxis
+                dataKey="periodo"
+                tick={{ fontSize: 12 }}
+              />
+
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12 }}
+              />
+
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="creadas"
+                name="Creadas"
+                stroke="#3B82F6"
+                strokeWidth={3}
+                dot={{ r: 5 }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="resueltas"
+                name="Resueltas"
+                stroke="#22C55E"
+                strokeWidth={3}
+                dot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </article>      
       </section>
     )}
 

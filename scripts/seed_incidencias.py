@@ -121,26 +121,55 @@ def ejecutar(args):
             ahora = datetime.now(timezone.utc)
             ids = []
             estados = Counter()
+            duraciones_resolucion = [6, 18, 36, 60, 96]
             for indice, registro in enumerate(registros):
-                estado = 'Pendiente' if indice % 20 < 8 else ('En progreso' if indice % 20 < 15 else 'Resuelta')
+                estado = (
+                    'Pendiente' if indice % 20 < 8
+                    else ('En progreso' if indice % 20 < 15 else 'Resuelta')
+                )
+
                 creada = ahora - timedelta(days=30, hours=indice)
-                cursor.execute('''INSERT INTO public.incidencias
+                cursor.execute(
+                    '''INSERT INTO public.incidencias
                     (titulo, categoria, descripcion, prioridad, fecha_creacion)
                     VALUES (%s, %s, %s, %s, %s) RETURNING id''',
-                    (registro.titulo, registro.categoria.value, registro.descripcion, registro.prioridad.value, creada))
+                    (
+                        registro.titulo,
+                        registro.categoria.value,
+                        registro.descripcion,
+                        registro.prioridad.value,
+                        creada,
+                    )
+                )
+
                 identificador = cursor.fetchone()[0]
                 ids.append(identificador)
                 if estado != 'Pendiente':
-                    cursor.execute('''UPDATE public.incidencias SET estado = 'En progreso'
-                        WHERE id = %s AND estado = 'Pendiente' ''', (identificador,))
+                    cursor.execute(
+                        '''UPDATE public.incidencias SET estado = 'En progreso'
+                        WHERE id = %s AND estado = 'Pendiente' ''',
+                        (identificador,)
+                    )
+
                     if cursor.rowcount != 1:
                         raise RuntimeError('No se pudo iniciar la incidencia nueva.')
+
                 if estado == 'Resuelta':
-                    cursor.execute('''UPDATE public.incidencias SET estado = 'Resuelta', fecha_resolucion = %s
-                        WHERE id = %s AND estado = 'En progreso' ''', (creada + timedelta(days=2), identificador))
+                    horas_resolucion = duraciones_resolucion[
+                        (indice // 20) % len(duraciones_resolucion)
+                    ]
+                    fecha_resolucion = creada + timedelta(hours=horas_resolucion)
+                    cursor.execute(
+                        '''UPDATE public.incidencias
+                        SET estado = 'Resuelta', fecha_resolucion = %s
+                        WHERE id = %s AND estado = 'En progreso' ''',
+                        (fecha_resolucion, identificador)
+                    )
+
                     if cursor.rowcount != 1:
                         raise RuntimeError('No se pudo resolver la incidencia nueva.')
                 estados[estado] += 1
+
             cursor.execute('SELECT count(*) FROM public.incidencias')
             total = cursor.fetchone()[0]
             if registros and total != OBJETIVO:
