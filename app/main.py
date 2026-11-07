@@ -1,5 +1,6 @@
 import csv
 import io
+from zoneinfo import ZoneInfo
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from fastapi.responses import StreamingResponse
@@ -193,7 +194,7 @@ def exportar_incidencias_excel(
 
             # Excel no admite fechas con zona horaria.
             if hasattr(valor, "tzinfo") and valor.tzinfo is not None:
-                valor = valor.replace(tzinfo=None)
+                valor = valor.astimezone(ZoneInfo('America/Santiago')).replace(tzinfo=None)
 
             fila.append(valor)
 
@@ -207,6 +208,8 @@ def exportar_incidencias_excel(
         ].width = ancho
 
     hoja.freeze_panes = "A2"
+    hoja['G1'].value = 'Fecha de creación (America/Santiago)'
+    hoja['H1'].value = 'Fecha de resolución (America/Santiago)'
     hoja.auto_filter.ref = hoja.dimensions
 
     archivo = io.BytesIO()

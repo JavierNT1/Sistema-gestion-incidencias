@@ -16,6 +16,9 @@ __pycache__/
 node_modules/
 dist/
 coverage/
+.coverage
+.coverage.*
+htmlcov/
 
 # Archivos del sistema
 .DS_Store

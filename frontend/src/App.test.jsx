@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { cleanup } from '@testing-library/react'
 import App from './App'
@@ -511,4 +511,54 @@ describe('Paginación de incidencias', () => {
       .toHaveTextContent(/Página\s*1\s*de\s*2/i)
   })
 
+})
+
+const datos = [
+  { id: 1, titulo: 'Caso medio', categoria: 'Otros', descripcion: 'Descripción', prioridad: 'Media', estado: 'Pendiente', fecha_creacion: '2026-10-01T12:00:00Z', fecha_resolucion: null },
+  { id: 2, titulo: 'Caso alto', categoria: 'Otros', descripcion: 'Descripción', prioridad: 'Alta', estado: 'Pendiente', fecha_creacion: '2026-10-01T12:00:00Z', fecha_resolucion: null },
+]
+const respuesta = (lista) => ({ok:true,json:async()=>lista})
+
+it('contiene el foco del modal, cierra con Escape y restaura el foco', async () => {
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(respuesta(datos)))
+  const usuario = userEvent.setup()
+  render(<App />)
+  const fila = (await screen.findByText('Caso medio')).closest('tr')
+  fila.focus()
+  await usuario.keyboard('{Enter}')
+  const dialogo = screen.getByRole('dialog',{name:'Detalle de incidencia #1'})
+  expect(dialogo).toHaveFocus()
+  await usuario.tab()
+  expect(within(dialogo).getByRole('button',{name:'Cerrar detalle'})).toHaveFocus()
+  await usuario.tab({shift:true})
+  expect(within(dialogo).getByRole('button',{name:'Eliminar incidencia'})).toHaveFocus()
+  await usuario.tab()
+  expect(within(dialogo).getByRole('button',{name:'Cerrar detalle'})).toHaveFocus()
+  await usuario.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(fila).toHaveFocus()
+})
+
+it('ignora respuestas antiguas aunque el servidor no respete la cancelación', async () => {
+  let resolverAnterior
+  let signalAnterior
+  vi.stubGlobal('fetch',vi.fn((url, opciones) => {
+    if (new URL(url).searchParams.get('prioridad') === 'Alta') {
+      signalAnterior = opciones.signal
+      return new Promise((resolve) => { resolverAnterior = resolve })
+    }
+    return Promise.resolve(respuesta(datos))
+  }))
+  const usuario = userEvent.setup()
+  render(<App />)
+  await screen.findByText('Caso medio')
+  await usuario.click(screen.getByText('Prioridad',{selector:'summary'}))
+  await usuario.click(screen.getByRole('button',{name:'Alta'}))
+  await waitFor(() => expect(resolverAnterior).toBeTypeOf('function'))
+  await usuario.click(screen.getByRole('button',{name:'Limpiar filtros'}))
+  await screen.findByText('Caso medio')
+  expect(signalAnterior.aborted).toBe(true)
+  await act(async () => { resolverAnterior(respuesta([datos[1]])) })
+  expect(screen.getByText('Caso medio')).toBeInTheDocument()
+  expect(screen.getByText('Caso alto')).toBeInTheDocument()
 })

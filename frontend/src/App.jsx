@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import {
   Layers,
@@ -115,6 +115,50 @@ function cambiarTipoBusqueda(tipo) {
 
 const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState(null)
 const [modoEdicion, setModoEdicion] = useState(false)
+const modalRef = useRef(null)
+const modalAbierto = incidenciaSeleccionada !== null
+
+useEffect(() => {
+  if (!modalAbierto) return
+  const anterior = document.activeElement
+  const modal = modalRef.current
+  const elementos = () => [...modal.querySelectorAll(
+    'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
+  )]
+  const fondo = [...modal.parentElement.parentElement.children]
+    .filter((elemento) => elemento !== modal.parentElement)
+    .map((elemento) => [elemento, elemento.inert])
+  fondo.forEach(([elemento]) => { elemento.inert = true })
+  modal.focus()
+  function teclado(evento) {
+    if (evento.key === 'Escape') {
+      evento.preventDefault()
+      setErroresEdicion({})
+      setModoEdicion(false)
+      setIncidenciaSeleccionada(null)
+    }
+    if (evento.key === 'Tab') {
+      const controles = elementos()
+      const primero = controles[0]
+      const ultimo = controles.at(-1)
+      if (!primero) {
+        evento.preventDefault()
+      } else if (evento.shiftKey && (document.activeElement === primero || document.activeElement === modal)) {
+        evento.preventDefault()
+        ultimo.focus()
+      } else if (!evento.shiftKey && (document.activeElement === ultimo || document.activeElement === modal)) {
+        evento.preventDefault()
+        primero.focus()
+      }
+    }
+  }
+  modal.addEventListener('keydown', teclado)
+  return () => {
+    modal.removeEventListener('keydown', teclado)
+    fondo.forEach(([elemento, inert]) => { elemento.inert = inert })
+    if (anterior?.isConnected) anterior.focus()
+  }
+}, [modalAbierto])
 const [tituloEditado, setTituloEditado] = useState('')
 const [descripcionEditada, setDescripcionEditada] = useState('')
 const [prioridadEditada, setPrioridadEditada] = useState('')
@@ -215,6 +259,8 @@ setError(error.message)
 }
 
 useEffect(() => {
+const controlador = new AbortController()
+let activo = true
 async function cargarIncidencias() {
 setCargando(true)
 setError('')
@@ -230,17 +276,18 @@ try {
     url.searchParams.set('estado', filtroEstado)
   }
 
-  const respuesta = await fetch(url)
+  const respuesta = await fetch(url, { signal: controlador.signal })
 
   if (!respuesta.ok) {
     throw new Error('No se pudieron obtener las incidencias')
   }
 
   const datos = await respuesta.json()
+  if (!activo) return
   setIncidencias(datos)
 
   const respuestaCompleta = await fetch(
-    'http://127.0.0.1:8000/incidencias'
+    'http://127.0.0.1:8000/incidencias', { signal: controlador.signal }
   )
 
   if (!respuestaCompleta.ok) {
@@ -248,17 +295,22 @@ try {
   }
 
   const todas = await respuestaCompleta.json()
+  if (!activo) return
   setTodasLasIncidencias(todas)
 
 } catch (error) {
-  setError(error.message)
+  if (activo && error.name !== 'AbortError') setError(error.message)
 } finally {
-  setCargando(false)
+  if (activo) setCargando(false)
 }
 
 }
 
 cargarIncidencias()
+return () => {
+  activo = false
+  controlador.abort()
+}
 }, [filtroPrioridad, filtroEstado])
 
 const totalIncidencias = todasLasIncidencias.length
@@ -1495,10 +1547,15 @@ return (
     <div className="modal-overlay" onClick={cerrarDetalle}>
       <div
         className="incident-modal"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detalle-incidencia-titulo"
+        tabIndex={-1}
         onClick={(evento) => evento.stopPropagation()}
       >
         <div className="modal-header">
-          <h2>Detalle de incidencia #{incidenciaSeleccionada.id}</h2>
+          <h2 id="detalle-incidencia-titulo">Detalle de incidencia #{incidenciaSeleccionada.id}</h2>
 
           <button
             type="button"
