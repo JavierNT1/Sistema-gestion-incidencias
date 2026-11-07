@@ -7,6 +7,20 @@ y estado, y permite analizar la actividad mediante estadísticas y reportes.
 La versión 1.0 reúne una API REST con PostgreSQL y una interfaz React. La
 configuración incluida está orientada a **desarrollo y demostración local**.
 
+## Capturas de pantalla
+
+### Panel principal
+![Panel principal de SistemaINC](screenshots/Dashboard.png)
+
+### Registro de incidencias
+![Nueva incidencia](screenshots/NuevaINC.png)
+
+### Estadísticas
+![Estadísticas de SistemaINC](screenshots/Stats1.png)
+
+### Estadísticas adicionales
+![Gráficos estadísticos](screenshots/Stats2.png)
+
 ## 1. Tecnologías
 
 | Componente | Tecnología verificada | Función |
